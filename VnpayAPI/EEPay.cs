@@ -291,9 +291,9 @@ namespace VnpayAPI
     {
         public static int testcnt = 0;
 
-        static string ApiUrl = $"https://vgth-api.gamemasterpay.com/api/";
+        static string ApiUrl = $"https://vgth-api.com/api/";
 
-        //static string ApiUrl = $"https://vgth-apistaging.gamemasterpay.com/api/";
+        //static string ApiUrl = $"https://vgth-apistaging.com/api/";
 
         public static async Task<EEDepositResult> EEDeposit(string Player, string Agent, string TransNumber, string Amount, string BankCode, string BankName, string BankAccount, string Remark, string channel)
         {

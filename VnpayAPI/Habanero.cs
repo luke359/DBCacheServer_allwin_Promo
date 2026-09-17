@@ -273,22 +273,13 @@ namespace VnpayAPI
     public class HABA
     {
         //正式
-        static string HABAWebApiUrl = "https://ws-b.insvr.com/jsonapi";
-        static string HABALaunchApiUrl = "https://app-b.insvr.com/play";
-        static string HABAHistoryApiUrl = "https://app-b.insvr.com/games/history";
+        static string HABAWebApiUrl = "https://ws-b.com/jsonapi";
+        static string HABALaunchApiUrl = "https://app-b.com/play";
+        static string HABAHistoryApiUrl = "https://app-b.com/games/history";
 
-        static string HABABrandId = "84608d0e-1520-f011-8b3b-00224856e463";
-        static string HABAApiKey = "75B549EF-3E06-4E72-892A-1E5D1F5CBC93";
+        static string HABABrandId = "84608d0e-224856e463";
+        static string HABAApiKey = "75B5491F5CBC93";
         static string HABACurrency = "MYR"; //幣別
-
-        //測試
-        //static string HABAWebApiUrl = "https://ws-test.insvr.com/jsonapi";
-        //static string HABALaunchApiUrl = "https://app-test.insvr.com/play";
-        //static string HABAHistoryApiUrl = "https://app-test.insvr.com/games/history";
-
-        //static string HABABrandId = "34c5e1c1-0415-f011-aaa7-6045bd90b91f";
-        //static string HABAApiKey = "ECC23C52-CE0A-42E0-A2D1-8C824030C746";
-        //static string HABACurrency = "MYR"; //幣別
 
 
         /// <summary>HABA轉帳幣比</summary>

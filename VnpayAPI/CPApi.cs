@@ -201,14 +201,9 @@ namespace VnpayAPI
     public class CP
     {
         //正式
-        static readonly string AppID = "bwg6zf30qhr2sy3pdpng";
-        static readonly string SecretKey = "cYst5WKaIZbtFqIILzID41fygDYlsvcr";
-        static readonly string ApiRoute = "https://egc-api.cpevlph1.com/api/"; //{api_domain}/api/
-
-        //測試
-        //static readonly string AppID = "bwndlm7szixsznbvwtxs";
-        //static readonly string SecretKey = "kDKtomxabULzcJLFJHyCy9cflJP4VEoF";
-        //static readonly string ApiRoute = "https://egc-api.ltbzidfkk8.com/api/";
+        static readonly string AppID = "bwg6zfpng";
+        static readonly string SecretKey = "cYst5WKDYlsvcr";
+        static readonly string ApiRoute = "https://egc-api.api/"; //{api_domain}/api/
 
         /// <summary>CP轉帳幣比</summary>
         const int CPCurrency = 100;

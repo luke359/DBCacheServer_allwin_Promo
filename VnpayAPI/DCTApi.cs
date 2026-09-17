@@ -210,17 +210,12 @@ namespace VnpayAPI
     public class DCT
     {
         //正式
-        static string DCTApiUrl = "https://gaming.dcgames.asia";
-        static string DCTgetBetDataUrl = "https://ticket.dcgames.asia";
-        static string DCTApiKey = "3E1D31BB544D458FB8BA54A3211474CE";
+        static string DCTApiUrl = "https://gaming.asia";
+        static string DCTgetBetDataUrl = "https://ticket.asia";
+        static string DCTApiKey = "3E1D311474CE";
 
-        //測試
-        //static string DCTApiUrl = "https://gaming.stagedc.net";
-        //static string DCTgetBetDataUrl = "https://ticket.stagedc.net";
-        //static string DCTApiKey = "105410A106544B8E9A68F432268F7557";
-
-        static string DCTBrandId = "T022173"; //ALIBABA
-        static string DCTCurrency = "MYR"; //幣別
+        static string DCTBrandId = "T023"; //ALIBABA
+        static string DCTCurrency = "MR"; //幣別
         static string DCTCountry = "MY";  //國別
         static string DCTChannel = "mobile"; //"pc" or "mobile"
 

@@ -264,11 +264,8 @@ namespace VnpayAPI
     public class FC
     {
         //正式
-        static string FCApiBaseUrl = "http://ap1.fcg1688.net";
-        static string FCAgentKey = "5fhdhUrbPjatX3Da";
-        //測試
-        //static string FCApiBaseUrl = "https://api.fcg666.net"; //測試
-        //static string FCAgentKey = "y1UEsHzwJi8rc68P"; //測試
+        static string FCApiBaseUrl = "http://ap1.net";
+        static string FCAgentKey = "5fhdatX3Da";
 
         static string FCAgentCode = "ALBBM";
 

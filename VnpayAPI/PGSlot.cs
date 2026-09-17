@@ -340,22 +340,12 @@ namespace VnpayAPI
 
     public class PGSlot
     {
-        //staging
-        //static readonly string OperatorToken = "a273132a-3d40-44bd-972c-39d59508981b";
-        //static readonly string SecretKey = "71ef2ef8-92ef-4417-8649-e49407d04bc8";
+        static readonly string OperatorToken = "fe-aa37-9900-9dea4ac4";
+        static readonly string SecretKey = "b31-467c-8b88-b6d8";
 
-        //production
-        static readonly string OperatorToken = "1e5a4afe-aa37-45fc-9900-9dea4ac44c92";
-        static readonly string SecretKey = "38677b31-467c-4974-8b88-b6d8798b35d3";
-
-        static readonly string ApiCashRoute = "https://api.pgs-bo.com/external/Cash/v3/";
-        static readonly string ApiBrtRoute = "https://api.pgs-bo.com/external/Bet/v4/";
+        static readonly string ApiCashRoute = "https://api.pgs-bo.com/";
+        static readonly string ApiBrtRoute = "https://api.pgs-bo.com/";
         const double ApiTimeout = 15;  // 設定請求超時為 15 秒
-
-        //public static class HttpClientManager
-        //{
-        //    public static readonly HttpClient Instance = new HttpClient();
-        //}
 
         /// <summary></summary>
         public static async Task<PGSlotResult> CheckPlayerBalance(string player_name)

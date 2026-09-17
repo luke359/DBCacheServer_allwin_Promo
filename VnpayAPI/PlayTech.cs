@@ -198,27 +198,16 @@ namespace VnpayAPI
 
     public class PlayTech
     {
-        //正式環境
-        //static string PTPassWord = "MKBIetVLmD0lpUUl"; //2025
-        //static string SSLCertPath = "AGDRA_PROD.p12"; //2025
-        static string PTPassWord = "jsWdeS76dKqB8uid"; //2026 Api憑證
-        static string SSLCertPath = "ADGRA-PROD-20270105.p12"; //2026 Api憑證
-        static string SecurityKey = "aa36e4b43b6b7fbe8c4d88ca3cbe15ba9496cbc2a934a6662abdb78bdd94605187aa2d67d0b798603c037fb6a36da49e8ba361af3d7033b9f9d1082f49296a4b";
+        static string PTPassWord = "8uid"; //2026 Api憑證
+        static string SSLCertPath = "70105.p1"; //2026 Api憑證
+        static string SecurityKey = "d88ca3cbe15ba9496cbc2a934a6662abdb78af3d7033b9f9d1082";
         static string PTCurrency = "MYR"; //幣別 1:1
-        static string MerchantCode = "ALIBABAMYR"; //商號ID
+        static string MerchantCode = "ALI"; //商號ID
 
-        //測試環境
-        //static string PTPassWord = "A6ZCfYoycq5tDa5p";
-        //static string SSLCertPath = "AGDRA_UAT.p12";
-        //static string SecurityKey = "215e5fb462e94a2b43497c0eeb5818f55a7f7ca30d08590db1745579fbf2c35f73083b548abe24a51a317326ee8fccb6d0c52819d6fe4e0be72d4703bc2f70a4";
-        //static string PTCurrency = "CNY"; //幣別
-        //static string MerchantCode = "ALI88"; //商號ID
-
-        //其他不變參數
-        static string PTApiUrl = "https://kioskpublicapi.88shared.com/";
-        static string Cloudlocation = "88shared";
-        static string MobileHub = "nptgp";
-        static string Virtualdatabase = "agdragon";
+        static string PTApiUrl = "https://88shared.com/";
+        static string Cloudlocation = "88sh";
+        static string MobileHub = "ngp";
+        static string Virtualdatabase = "agon";
         static int SystemID = 77;
 
 

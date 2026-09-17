@@ -257,18 +257,15 @@ namespace VnpayAPI
 
     public class JILI
     {
-        static readonly string AgentID = "BT_ALBBJL_alibaba_MYR";
+        static readonly string AgentID = "T_ALBBJL_YR";
 
-        //User Acceptance Test
-        //static readonly string AgentKey = "89f796521f5214cbb98bdc5bab081aac78eac1df";
-        //static readonly string ApiRoute = "https://uat-wb-api-2.kijl788du.com/api1/";
 
         /// <summary>JILI轉帳幣比</summary>
         const int JILICurrency = 100;
 
         //Production：
-        static readonly string AgentKey = "064fcfe5e9d64ef6958cfe6a7a94b350d5b4d1aa";
-        static readonly string ApiRoute = "https://wb-api-2.huuykk865s.com/api1/";
+        static readonly string AgentKey = "fe5e9d64ef6958cf";
+        static readonly string ApiRoute = "https://wb-api-2.com/api1/";
 
         const double ApiTimeout = 15;  // 設定請求超時為 15 秒
         // 靜態 HttpClient 實例

@@ -204,18 +204,14 @@ namespace VnpayAPI
 
     public class AceWin
     {
-        static readonly string AgentID = "albb_alibabamy_myr";
-
-        //User Acceptance Test
-        //static readonly string AgentKey = "128f0bc2ad9072bd631b1bea1de6a8ecd7a35fab";
-        //static readonly string ApiRoute = "https://macross-platform-ag-stg.acewinplusfafafa.com/api1/";
+        static readonly string AgentID = "albb_myr";
 
         /// <summary>JILI轉帳幣比</summary>
         const int AceWinCurrency = 100;
 
         //Production：
-        static readonly string AgentKey = "2a289aa2bee2856a9b304dce8bd21075d30591b2";
-        static readonly string ApiRoute = "https://macross-platform-ag-prod.acewinplusfafafa.com/api1/";
+        static readonly string AgentKey = "2a289aa2bee2856a9d21075d30591b2";
+        static readonly string ApiRoute = "https://macross-ag-prod.com/api1/";
 
         const double ApiTimeout = 15;  // 設定請求超時為 15 秒
 
@@ -575,30 +571,42 @@ namespace VnpayAPI
                         //client2.Timeout = TimeSpan.FromSeconds(ApiTimeout);
                         HttpResponseMessage response = await _Client.SendAsync(request);
 
-                        response.EnsureSuccessStatusCode();
+                        //response.EnsureSuccessStatusCode(); //1. 不要使用EnsureSuccessStatusCode()，因為它會在非成功狀態碼時拋出異常，這樣就無法獲取API返回的錯誤信息。
 
-                        if (response != null)
+                        if (response.IsSuccessStatusCode) //2. 直接檢查response.IsSuccessStatusCode來判斷是否成功。
                         {
-                            if (response.IsSuccessStatusCode == true)
+                            if (response != null)
                             {
-                                // 取得呼叫完成 API 後的回報內容
-                                String strResult = await response.Content.ReadAsStringAsync();
+                                if (response.IsSuccessStatusCode == true)
+                                {
+                                    // 取得呼叫完成 API 後的回報內容
+                                    String strResult = await response.Content.ReadAsStringAsync();
 
-                                var values = JsonSerializer.Deserialize<Dictionary<string, Object>>(strResult);
+                                    var values = JsonSerializer.Deserialize<Dictionary<string, Object>>(strResult);
 
-                                AceWinTransferResult result = new();
+                                    AceWinTransferResult result = new();
 
-                                result.ErrorCode = values["ErrorCode"].ToString();
+                                    result.ErrorCode = values["ErrorCode"].ToString();
 
-                                result.Message = values["Message"].ToString();
+                                    result.Message = values["Message"].ToString();
 
-                                result.Data = (values["Data"] == null) ? null : JsonSerializer.Deserialize<AceWinTransferData>(values["Data"].ToString());
+                                    result.Data = (values["Data"] == null) ? null : JsonSerializer.Deserialize<AceWinTransferData>(values["Data"].ToString());
 
-                                return result;
+                                    return result;
+                                }
+                                else
+                                {
+                                    //Console.WriteLine("TransferInPlayerBalance Response ERROR!!");
+
+                                    AceWinTransferResult result = new AceWinTransferResult();
+                                    result.ErrorCode = "9988";
+                                    result.Message = "post connection status error";
+                                    return result;
+                                }
                             }
                             else
                             {
-                                //Console.WriteLine("TransferInPlayerBalance Response ERROR!!");
+                                //Console.WriteLine("TransferInPlayerBalance ERROR 無回應!");
 
                                 AceWinTransferResult result = new AceWinTransferResult();
                                 result.ErrorCode = "9988";
@@ -608,11 +616,12 @@ namespace VnpayAPI
                         }
                         else
                         {
-                            //Console.WriteLine("TransferInPlayerBalance ERROR 無回應!");
-
+                            //3. 伺服器有回應，但狀態碼是錯誤的 (如 403、404、500)
+                            string errorContent = await response.Content.ReadAsStringAsync(); //(重點在這裡) 取得API返回的詳細錯誤說明與原因以供除錯 
                             AceWinTransferResult result = new AceWinTransferResult();
-                            result.ErrorCode = "9988";
-                            result.Message = "post connection status error";
+                            //result.ErrorCode = "9990";
+                            result.ErrorCode = "101"; // 錯誤狀態碼皆以 "查無此人" 處理, 因為再重試也不會OK 
+                            result.Message = errorContent;
                             return result;
                         }
                     }
@@ -620,6 +629,7 @@ namespace VnpayAPI
             }
             catch (Exception ex)
             {
+                //其他未預期的錯誤
                 Console.WriteLine("TransferInPlayerBalance ERROR Exception : " + ex);
 
                 AceWinTransferResult result = new AceWinTransferResult();

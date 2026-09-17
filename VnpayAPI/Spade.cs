@@ -230,24 +230,10 @@ namespace VnpayAPI
     public class Spade
     {
         //正式
-        static string SPApiUrl = "https://merchantapi.silverkirin88.com/api";
-        static string MerchantCode = "ALI88"; //商號ID
-        static string SecurityKey = "ALI88XM1YwI1epGpFWCvl";
+        static string SPApiUrl = "https://silverkir";
+        static string MerchantCode = "A88"; //商號ID
+        static string SecurityKey = "A88XM1YwI1e";
         static string SPCurrency = "MY2"; //幣別 1:100
-
-        //測試
-        //static string SPApiUrl = "https://api-egame-staging.sgplay.net/api";
-        //static string MerchantCode = "ALI88"; //商號ID
-        //static string SecurityKey = "ALI88DcTmm5nNBY1NlLl6";
-        //static string SPCurrency = "MY2"; //幣別 1:100
-
-        //API Command:
-        //getAuthorize 取得遊戲 url
-        //getAcctInfo 查询用户信息（如余额）
-        //deposit 充值
-        //withdraw 取款
-        //checkStatus 查询 充值/取款 状态
-        //kickAcct 强制登出
 
         /// <summary>Spade轉帳幣比</summary>
         const int TransCurrency = 100; //100:1

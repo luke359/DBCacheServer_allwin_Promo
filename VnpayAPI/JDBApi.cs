@@ -216,28 +216,12 @@ namespace VnpayAPI
     public class JDB
     {
         //正式
-        static string JDBApiUrl = "http://api.jdb1688.net/apiRequest.do";
+        static string JDBApiUrl = "http://api/apiRequest.do";
         static string dcName = "JKJD"; //客户域名
-        static string key_aes = "af12a73f434b43c3";
-        static string iv_aes = "2e7e1835b596d5f0";
+        static string key_aes = "f143c3";
+        static string iv_aes = "d5f0";
 
-        //正式RM
-        //static string AgentName = ""; //代理帳號()
-
-        //正式RMC
         static string AgentName = "alibaba88"; //代理帳號
-
-        ////測試
-        //static string JDBApiUrl = "https://api.jdb711.com/apiRequest.do";
-        //static string dcName = "JKJD"; //客户域名
-        //static string key_aes = "8880dc6955191877";
-        //static string iv_aes = "5513493b694856f6";
-
-        ////測試RM
-        //static string AgentName = "jkjdmyrag"; //代理帳號
-
-        //測試RMC
-        //static string AgentName = "jkjdrmcag"; //代理帳號
 
         /// <summary>JDB轉帳幣比</summary>
         const int JDBCurrency = 100; //MYRR 100(JDB):1(我)

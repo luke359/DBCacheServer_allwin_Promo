@@ -234,24 +234,10 @@ namespace VnpayAPI
     public class FastSpin
     {
         //正式
-        static string FSApiUrl = "https://api.fastspinzone.com/api";
-        static string MerchantCode = "ALI88"; //商號ID
-        static string SecurityKey = "ALI88NjNlqw0Pi3yKGkRq";
+        static string FSApiUrl = "https://api.com/api";
+        static string MerchantCode = "AL8"; //商號ID
+        static string SecurityKey = "ALINjNlyKGkRq";
         static string FSCurrency = "MY2"; //幣別 1:100
-
-        //測試
-        //static string FSApiUrl = "https://api-egame-staging.fsuat.com/api";
-        //static string MerchantCode = "ALI88"; //商號ID
-        //static string SecurityKey = "ALI88rz0hKxO6YJAkpYfD";
-        //static string FSCurrency = "MY2"; //幣別 1:100
-
-        //API Command:
-        //getAuthorize 取得遊戲 url
-        //getAcctInfo 查询用户信息（如余额）
-        //deposit 充值
-        //withdraw 取款
-        //checkStatus 查询 充值/取款 状态
-        //kickAcct 强制登出
 
         /// <summary>FastSpin轉帳幣比</summary>
         const int TransCurrency = 100; //100:1
