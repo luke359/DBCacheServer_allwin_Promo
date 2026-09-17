@@ -30,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../Promotion/src/Promotion.Data.MySql/Promotion.Data.MySql.csproj" />
+    <ProjectReference Include="../../Promotion/src/Promotion.Core/Promotion.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="Protocol">
       <HintPath>..\Protocol\bin\Debug\Protocol.dll</HintPath>
     </Reference>

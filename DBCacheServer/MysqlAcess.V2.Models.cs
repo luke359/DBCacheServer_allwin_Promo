@@ -35,7 +35,7 @@ namespace DBCacheServer
     public enum PromotionDataErrorKind : byte
     {
         Validation = 1, DuplicateKey = 2, Deadlock = 3, LockWaitTimeout = 4,
-        Connection = 5, CommitOutcomeUnknown = 6, DataCorruption = 7,
+        Connection = 5, CommitOutcomeUnknown = 6, DataCorruption = 7, ConcurrencyConflict = 8,
         Unexpected = 255
     }
 
