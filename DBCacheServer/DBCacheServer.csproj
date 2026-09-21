@@ -35,8 +35,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="ProbabilityLib">
+      <HintPath>bin\Release\net6.0\ProbabilityLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Promotion.Core.Contracts">
+      <HintPath>..\..\Promotion\src\Promotion.Core\bin\Release\net6.0\Promotion.Core.Contracts.dll</HintPath>
+    </Reference>
     <Reference Include="Protocol">
       <HintPath>..\Protocol\bin\Debug\Protocol.dll</HintPath>
+    </Reference>
+    <Reference Include="UserSessionReward.Core">
+      <HintPath>..\UserSessionReward\src\UserSessionReward.Core\bin\Release\net6.0\UserSessionReward.Core.dll</HintPath>
     </Reference>
     <Reference Include="VerProtocol">
       <HintPath>..\VerProtocol\bin\Debug\VerProtocol.dll</HintPath>

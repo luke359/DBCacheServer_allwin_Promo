@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Threading;
@@ -23,18 +25,13 @@ namespace DBCacheServer
         static string id = "";
         static string dbpwd = "";
         static string database = "";
-        static string writeConnection = "";
         private static readonly object _selectLock = new object();
 
         private MysqlAcess()
         {
             try
             {
-                string connectionFile = Environment.GetEnvironmentVariable("DB_CACHE_SQL_CONNECTION_FILE");
-                if (string.IsNullOrWhiteSpace(connectionFile))
-                    connectionFile = "SqlConnection.txt";
-
-                using (StreamReader sr = new StreamReader(connectionFile))
+                using (StreamReader sr = new StreamReader("SqlConnection.txt"))
                 {
                     String text;
 
@@ -44,10 +41,6 @@ namespace DBCacheServer
 
                         switch (words[0])
                         {
-                            case "mysqlConnectionWrite":
-                            case "mysqlConnection":
-                                writeConnection = words.Length > 1 ? words[1] : "";
-                                break;
                             case "DBIP":
                                 host = words[1];
                                 break;
@@ -77,9 +70,7 @@ namespace DBCacheServer
 
                 m_mutex = new Mutex();
                 //this.connstr = "server=" + host + ";uid=" + id + ";pwd=" + dbpwd + ";database=" + database + ";SslMode=None" + ";allowpublickeyretrieval=true" + ";charset=utf8;Allow User Variables=True;";
-                this.connstr = string.IsNullOrWhiteSpace(writeConnection)
-                    ? "server=" + host + ";uid=" + id + ";pwd=" + dbpwd + ";database=" + database + ";SslMode=Disabled" + ";allowpublickeyretrieval=true" + ";charset=utf8;Allow User Variables=True;"
-                    : writeConnection;
+                this.connstr = "server=" + host + ";uid=" + id + ";pwd=" + dbpwd + ";database=" + database + ";SslMode=Disabled" + ";allowpublickeyretrieval=true" + ";charset=utf8;Allow User Variables=True;";
                 dbConnection = new MySqlConnection(this.connstr);
                 //開啟sql連線
                 dbConnection.Open();
@@ -1182,6 +1173,372 @@ namespace DBCacheServer
             return -1;
         }
 
+        #region 參數化 Insert／Update／Select
+
+        /// <summary>
+        /// 以參數化查詢新增一列。表名與欄位名只允許識別字並加上反引號；值綁定為 <c>@set_欄名</c>，不拼進 SQL。
+        /// 沿用既有連線與 Mutex；失敗時記錄後重連再試一次，第二次仍失敗則擲出例外。
+        /// </summary>
+        /// <param name="tableName">資料表名稱。</param>
+        /// <param name="data">要寫入的欄位與已格式化字串值。</param>
+        /// <returns>影響列數與 <see cref="MySqlCommand.LastInsertedId"/>。</returns>
+        public MysqlParameterizedWriteResult InsertParameterized(string tableName, Dictionary<string, string> data)
+        {
+            ValidateSqlIdentifier(tableName, nameof(tableName));
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+
+            if (data.Count == 0)
+            {
+                throw new ArgumentException("寫入資料字典不得為空。", nameof(data));
+            }
+
+            ValidateColumnMap(data, nameof(data));
+
+            return ExecuteWithMutexRetry("InsertParameterized", tableName, delegate
+            {
+                return ExecuteInsertParameterized(tableName, data);
+            });
+        }
+
+        /// <summary>
+        /// 以參數化查詢更新列。條件全部為 AND 與相等。值綁定為 <c>@set_欄名</c>／<c>@where_欄名</c>，不拼進 SQL。
+        /// </summary>
+        /// <param name="tableName">資料表名稱。</param>
+        /// <param name="data">要更新的欄位與已格式化字串值。</param>
+        /// <param name="where">相等條件字典；不可為 null 或空。</param>
+        /// <returns>影響列數。</returns>
+        public long UpdateParameterized(string tableName, Dictionary<string, string> data, Dictionary<string, string> where)
+        {
+            ValidateSqlIdentifier(tableName, nameof(tableName));
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+
+            if (data.Count == 0)
+            {
+                throw new ArgumentException("寫入資料字典不得為空。", nameof(data));
+            }
+
+            if (where == null)
+            {
+                throw new ArgumentNullException(nameof(where));
+            }
+
+            if (where.Count == 0)
+            {
+                throw new ArgumentException("Update 操作必須提供 where 條件。", nameof(where));
+            }
+
+            ValidateColumnMap(data, nameof(data));
+            ValidateColumnMap(where, nameof(where));
+
+            return ExecuteWithMutexRetry("UpdateParameterized", tableName, delegate
+            {
+                return ExecuteUpdateParameterized(tableName, data, where);
+            });
+        }
+
+        /// <summary>
+        /// 以參數化查詢讀取列。條件全部為 AND 與相等。值綁定為 <c>@where_欄名</c>，不拼進 SQL。
+        /// 沿用既有連線與 Mutex，與 Insert／Update 共用同一把鎖。
+        /// </summary>
+        /// <param name="tableName">資料表名稱。</param>
+        /// <param name="fields">要查詢的欄位清單；null 或空則查詢 <c>*</c>。</param>
+        /// <param name="where">相等條件字典；null 或空則不加 WHERE。</param>
+        /// <returns>每一列一個欄位名對字串的字典；資料庫 NULL 為空字串。沒有資料時為空清單。</returns>
+        public List<Dictionary<string, string>> SelectParameterized(string tableName, IReadOnlyList<string> fields, Dictionary<string, string> where)
+        {
+            ValidateSqlIdentifier(tableName, nameof(tableName));
+            ValidateFieldList(fields, nameof(fields));
+            if (where != null)
+            {
+                ValidateColumnMap(where, nameof(where));
+            }
+
+            return ExecuteWithMutexRetry("SelectParameterized", tableName, delegate
+            {
+                return ExecuteSelectParameterized(tableName, fields, where);
+            });
+        }
+
+        private MysqlParameterizedWriteResult ExecuteInsertParameterized(string tableName, Dictionary<string, string> data)
+        {
+            m_cmd = dbConnection.CreateCommand();
+            StringBuilder columns = new StringBuilder();
+            StringBuilder parameters = new StringBuilder();
+            bool first = true;
+            foreach (KeyValuePair<string, string> pair in data)
+            {
+                if (!first)
+                {
+                    columns.Append(", ");
+                    parameters.Append(", ");
+                }
+
+                first = false;
+                columns.Append('`').Append(pair.Key).Append('`');
+                string parameterName = "@set_" + pair.Key;
+                parameters.Append(parameterName);
+                m_cmd.Parameters.AddWithValue(parameterName, pair.Value);
+            }
+
+            this._sql = "INSERT INTO `" + tableName + "` (" + columns + ") VALUES (" + parameters + ")";
+            m_cmd.CommandText = this._sql;
+            int affectedRows = m_cmd.ExecuteNonQuery();
+            return new MysqlParameterizedWriteResult(affectedRows, m_cmd.LastInsertedId);
+        }
+
+        private long ExecuteUpdateParameterized(string tableName, Dictionary<string, string> data, Dictionary<string, string> where)
+        {
+            m_cmd = dbConnection.CreateCommand();
+            StringBuilder sql = new StringBuilder();
+            sql.Append("UPDATE `").Append(tableName).Append("` SET ");
+            AppendAssignments(sql, m_cmd, data, "@set_");
+            sql.Append(" WHERE ");
+            AppendEqualsConditions(sql, m_cmd, where, "@where_");
+            this._sql = sql.ToString();
+            m_cmd.CommandText = this._sql;
+            return m_cmd.ExecuteNonQuery();
+        }
+
+        private List<Dictionary<string, string>> ExecuteSelectParameterized(string tableName, IReadOnlyList<string> fields, Dictionary<string, string> where)
+        {
+            m_cmd = dbConnection.CreateCommand();
+            StringBuilder sql = new StringBuilder();
+            sql.Append("SELECT ");
+            if (fields == null || fields.Count == 0)
+            {
+                sql.Append('*');
+            }
+            else
+            {
+                for (int i = 0; i < fields.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        sql.Append(", ");
+                    }
+
+                    sql.Append('`').Append(fields[i]).Append('`');
+                }
+            }
+
+            sql.Append(" FROM `").Append(tableName).Append('`');
+            if (where != null && where.Count > 0)
+            {
+                sql.Append(" WHERE ");
+                AppendEqualsConditions(sql, m_cmd, where, "@where_");
+            }
+
+            this._sql = sql.ToString();
+            m_cmd.CommandText = this._sql;
+            m_reader = m_cmd.ExecuteReader();
+
+            List<Dictionary<string, string>> rows = new List<Dictionary<string, string>>();
+            if (m_reader.HasRows)
+            {
+                while (m_reader.Read())
+                {
+                    Dictionary<string, string> row = new Dictionary<string, string>();
+                    for (int i = 0; i < m_reader.FieldCount; i++)
+                    {
+                        string fieldName = m_reader.GetName(i).Trim();
+                        row.Add(fieldName, ReadFieldAsInvariantString(m_reader, i));
+                    }
+
+                    rows.Add(row);
+                }
+            }
+
+            return rows;
+        }
+
+        private T ExecuteWithMutexRetry<T>(string operationName, string tableName, Func<T> action)
+        {
+            Exception firstException = null;
+
+            m_mutex.WaitOne();
+            try
+            {
+                this.reOpen();
+                if (dbConnection.State == ConnectionState.Open)
+                {
+                    try
+                    {
+                        return action();
+                    }
+                    catch (Exception ex)
+                    {
+                        this.errorMsg(ex);
+                        MyConsole.WriteLine("Acess " + operationName + " " + tableName);
+                        firstException = ex;
+                    }
+                    finally
+                    {
+                        this.closeHandle();
+                    }
+                }
+            }
+            finally
+            {
+                m_mutex.ReleaseMutex();
+            }
+
+            ReConnect();
+
+            m_mutex.WaitOne();
+            try
+            {
+                this.reOpen();
+                if (dbConnection.State == ConnectionState.Open)
+                {
+                    try
+                    {
+                        return action();
+                    }
+                    catch (Exception ex)
+                    {
+                        this.errorMsg(ex);
+                        MyConsole.WriteLine("Acess " + operationName + " " + tableName);
+                        throw;
+                    }
+                    finally
+                    {
+                        this.closeHandle();
+                    }
+                }
+
+                throw new InvalidOperationException("MySQL 連線未開啟，無法執行參數化 " + operationName + "。", firstException);
+            }
+            finally
+            {
+                m_mutex.ReleaseMutex();
+            }
+        }
+
+        private static void AppendAssignments(StringBuilder sql, MySqlCommand command, Dictionary<string, string> values, string parameterPrefix)
+        {
+            bool first = true;
+            foreach (KeyValuePair<string, string> pair in values)
+            {
+                if (!first)
+                {
+                    sql.Append(", ");
+                }
+
+                first = false;
+                string parameterName = parameterPrefix + pair.Key;
+                sql.Append('`').Append(pair.Key).Append("` = ").Append(parameterName);
+                command.Parameters.AddWithValue(parameterName, pair.Value);
+            }
+        }
+
+        private static void AppendEqualsConditions(StringBuilder sql, MySqlCommand command, Dictionary<string, string> values, string parameterPrefix)
+        {
+            bool first = true;
+            foreach (KeyValuePair<string, string> pair in values)
+            {
+                if (!first)
+                {
+                    sql.Append(" AND ");
+                }
+
+                first = false;
+                string parameterName = parameterPrefix + pair.Key;
+                sql.Append('`').Append(pair.Key).Append("` = ").Append(parameterName);
+                command.Parameters.AddWithValue(parameterName, pair.Value);
+            }
+        }
+
+        private static string ReadFieldAsInvariantString(MySqlDataReader reader, int ordinal)
+        {
+            if (reader.IsDBNull(ordinal))
+            {
+                return "";
+            }
+
+            object raw = reader.GetValue(ordinal);
+            if (raw is DateTime dateTime)
+            {
+                return dateTime.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture);
+            }
+
+            return Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "";
+        }
+
+        private static void ValidateSqlIdentifier(string name, string paramName)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException(paramName);
+            }
+
+            if (!IsSafeSqlIdentifier(name))
+            {
+                throw new ArgumentException("SQL 識別字只能是英數字與底線，且不可從數字開頭。值=" + name, paramName);
+            }
+        }
+
+        private static void ValidateColumnMap(Dictionary<string, string> values, string paramName)
+        {
+            foreach (KeyValuePair<string, string> pair in values)
+            {
+                ValidateSqlIdentifier(pair.Key, paramName);
+                if (pair.Value == null)
+                {
+                    throw new ArgumentException("欄位值不得為 null。欄位=" + pair.Key, paramName);
+                }
+            }
+        }
+
+        private static void ValidateFieldList(IReadOnlyList<string> fields, string paramName)
+        {
+            if (fields == null || fields.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < fields.Count; i++)
+            {
+                ValidateSqlIdentifier(fields[i], paramName);
+                if (!seen.Add(fields[i]))
+                {
+                    throw new ArgumentException("查詢欄位重複。欄位=" + fields[i], paramName);
+                }
+            }
+        }
+
+        private static bool IsSafeSqlIdentifier(string name)
+        {
+            if (name.Length == 0)
+            {
+                return false;
+            }
+
+            char first = name[0];
+            if (!(first == '_' || (first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')))
+            {
+                return false;
+            }
+
+            for (int i = 1; i < name.Length; i++)
+            {
+                char c = name[i];
+                if (!(c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        #endregion
 
         /************************************************************************/
         /* 如果连接已经关闭就重新连接记录集是打开状态的关闭*/

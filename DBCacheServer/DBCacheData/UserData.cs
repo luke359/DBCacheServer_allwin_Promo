@@ -6,6 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using UserSessionReward.Core.Enums;
+using UserSessionReward.Core.Models;
+using ProbabilityLib;
 
 namespace DBCacheServer
 {
@@ -192,6 +195,8 @@ namespace DBCacheServer
                 RedBonusServer = CacheManeger.DecodeServerList(datalist[nameof(RedBonusServer)], $"[{UserID}]個人紅包放水");
 
                 CheckPayOutLimit();
+
+                SetRewardCacheData(datalist);
             }
         }
 
@@ -410,6 +415,9 @@ namespace DBCacheServer
 
             //機率參數 (WEB設置)
             updata.Add(nameof(ParaData), ParaData);
+            updata.Add(nameof(RewardCacheData), RewardCacheData); //#260821
+            updata.Add(nameof(ExtraInfo), ExtraInfo); //#260821
+
             paraDataChangeFg = false;
 
             return updata;
@@ -454,6 +462,11 @@ namespace DBCacheServer
             {
                 calaSetChangeFg = false;
                 updata.Add(nameof(CalcSet), CalcSet);
+            }
+
+            if (IsNewReRewardCacheData)
+            {
+                updata.Add(nameof(RewardCacheData), RewardCacheData); //#260821
             }
             //由遊戲端維護 : 以下值是由遊戲端上傳更新, 因此不需再回傳給遊戲端
             //updata.Add(nameof(WaterColl), WaterColl.ToString());
@@ -869,6 +882,305 @@ namespace DBCacheServer
         #endregion (玩家IP模式機率)
 
 
+        #region 玩家玩家上升額度 #260821
+        bool rewardCacheDebug = true;
+        /// <summary>玩家玩家上升額度資訊</summary>
+        public RewardCacheDataModel rewardCacheDataModel { get; private set; } = new RewardCacheDataModel();
+        /// <summary>要傳給玩家的上升額度資訊字串</summary>
+        private string RewardCacheData { get; set; }
+        /// <summary>Web 設定字串</summary>
+        public string RewardWebSetting { get; private set; }
+        /// <summary>主紀錄後取得的流水號 (0代表目前無有效紀錄)</summary>
+        public int RewardRecordId { get; private set; } = 0;
+        /// <summary>新資訊旗號 (非GameServer變更)</summary>
+        public bool IsNewReRewardCacheData { get; private set; } = true;
+        /// <summary></summary>
+        private string ExtraInfo { get; set; }
+        /// <summary>功能狀態</summary>
+        //public RewardEndStatus RewardEndStatus { get; private set; }
+
+        /// <summary>設定玩家RewardCacheData/RewardWebSetting資料 (Login時Load)</summary>
+        public void SetRewardCacheData(Dictionary<string, string> datalist)
+        {
+            if (datalist.ContainsKey(nameof(RewardCacheData)))
+            {
+                //#260821
+                RewardWebSetting = datalist[nameof(RewardWebSetting)];
+                RewardCacheData = datalist[nameof(RewardCacheData)];
+                ResetRewardRecordId();
+                //MyConsole.WriteLine($"    設定玩家[{UserUID}]RewardCache資料");
+            }
+            else
+            {
+                if (rewardCacheDebug) Console.WriteLine($"    玩家[{UserUID}]無RewardCache資料");
+            }
+        }
+
+        /// <summary>開機重設</summary>
+        private void ResetRewardRecordId()
+        {
+            IsNewReRewardCacheData = true;
+            if (RewardCacheData == null || RewardCacheData == "")
+            {
+                RewardRecordId = 0;
+                return;
+            }
+
+            string[] data = RewardCacheData.Split(",");
+            if (data.Length >= 3)
+            {
+                RewardRecordId = int.Parse(data[0]);
+                //if (RewardRecordId > 0)
+                {
+                    SetRewardCacheDataModel(RewardRecordId, data);
+                }
+                if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]重設上升額度資訊: Id={RewardRecordId}");
+            }
+        }
+
+        /// <summary>Check玩家上升額度資訊紀錄</summary>
+        public void CheckInProgressSession(UserSessionRewardRecord session)
+        {
+            if (rewardCacheDebug) MyConsole.WriteLine($"    檢查玩家[{UserID}]Session");
+
+            if (RewardCacheData != null && RewardCacheData != "")
+            {
+                string[] rcdata = RewardCacheData.Split(",");
+                if (rcdata.Length >= 3)
+                {
+                    if (int.TryParse(rcdata[0], out int recid))
+                    {
+                        if (recid == session.RewardRecordId)
+                        {
+                            RewardRecordId = (int)session.RewardRecordId;
+                            IsNewReRewardCacheData = true;
+                            SetExtraInfo(session.ExtraInfo);
+                            if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Session 正確");
+                            return;
+                        }
+
+                        if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Session 與紀錄不符, 重建");
+                    }
+                    else
+                    {
+                        if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Session 紀錄錯誤A, 重建");
+                    }
+                }
+                else
+                {
+                    if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Session 紀錄錯誤B, 重建");
+                }
+            }
+            else
+            {
+                if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Session 無紀錄, 重建");
+            }
+
+            RewardRecordId = (int)session.RewardRecordId;
+
+            rewardCacheDataModel = new();
+            rewardCacheDataModel.RewardRecordId = session.RewardRecordId;
+            rewardCacheDataModel.RewardEndStatus = session.RewardEndStatus;
+            rewardCacheDataModel.TargetBalance = session.TargetBalance;
+
+            IsNewReRewardCacheData = true;
+
+            (RewardCacheData, ExtraInfo) = ProbCal.InitRewardCacheData(rewardCacheDataModel.RewardRecordId, (int)rewardCacheDataModel.RewardEndStatus, rewardCacheDataModel.TargetBalance);
+            rewardCacheDataModel.ExtraInfo = ExtraInfo;
+            //RewardCacheData = $"{session.RewardRecordId},{(int)session.RewardEndStatus},{session.TargetBalance}";
+            if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]重建Session上升額度資訊: {RewardCacheData}");
+            return;
+        }
+
+        /// <summary>建立新的玩家上升額度資訊</summary>
+        public void CreateNewRewardCacheData(RewardCacheDataModel newData, double openAmount)
+        {
+            rewardCacheDataModel = new();
+            rewardCacheDataModel.RewardRecordId = newData.RewardRecordId;
+            rewardCacheDataModel.RewardEndStatus = newData.RewardEndStatus;
+            rewardCacheDataModel.TargetBalance = newData.TargetBalance;
+
+            IsNewReRewardCacheData = true;
+
+            (RewardCacheData, ExtraInfo) = ProbCal.InitRewardCacheData(rewardCacheDataModel.RewardRecordId, (int)rewardCacheDataModel.RewardEndStatus, rewardCacheDataModel.TargetBalance);
+            rewardCacheDataModel.ExtraInfo = ExtraInfo;
+            //RewardCacheData = $"{newData.RewardRecordId},{(int)newData.RewardEndStatus},{newData.TargetBalance}";
+            if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]建立新的上升額度資訊: {RewardCacheData}");
+        }
+
+        /// <summary>結束玩家上升額度資訊</summary>
+        public void EndRewardCacheData()
+        {
+            RewardRecordId = 0;
+            rewardCacheDataModel.RewardRecordId = 0;
+            rewardCacheDataModel.RewardEndStatus = RewardEndStatus.PlayerEarlyClose;
+            RewardCacheData = "";
+            if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]結束上升額度資訊");
+        }
+
+        /// <summary>結束玩家功能狀態資訊</summary>
+        public void EndRewardEndStatus(RewardEndStatus status)
+        {
+            //RewardRecordId = 0;
+            //rewardCacheDataModel.RewardRecordId = 0;
+            rewardCacheDataModel.RewardEndStatus = status;
+            //RewardCacheData = "";
+            //MyConsole.WriteLine($"    玩家[{UserID}]結束上升額度資訊");
+        }
+
+        /// <summary>以 Web 強制關閉上升額度功能；Session 紀錄保持進行中，統計以資料庫快照為準以免覆寫。</summary>
+        public void ApplyWebForceClose(UserSessionRewardRecord session)
+        {
+            RewardRecordId = (int)session.RewardRecordId;
+            rewardCacheDataModel.RewardRecordId = session.RewardRecordId;
+            rewardCacheDataModel.TargetBalance = session.TargetBalance;
+            rewardCacheDataModel.TotalGameCount = session.TotalGameCount;
+            rewardCacheDataModel.TotalBet = session.TotalBet;
+            rewardCacheDataModel.MaxBet = session.MaxBet;
+            rewardCacheDataModel.MinBet = session.MinBet;
+            rewardCacheDataModel.MaxBalance = session.MaxBalance;
+            rewardCacheDataModel.MinBalance = session.MinBalance;
+            rewardCacheDataModel.ExtraInfo = ExtraInfo;
+            rewardCacheDataModel.RewardEndStatus = RewardEndStatus.WebForceClose;
+
+            SetRewardCacheDataStatus(RewardEndStatus.WebForceClose);
+            IsNewReRewardCacheData = true;
+
+            if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]Web強制關閉上升額度功能: {RewardCacheData}");
+        }
+
+        private void SetRewardCacheDataStatus(RewardEndStatus status)
+        {
+            if (string.IsNullOrEmpty(RewardCacheData))
+            {
+                return;
+            }
+
+            string[] data = RewardCacheData.Split(',');
+            if (data.Length < 3)
+            {
+                return;
+            }
+
+            data[1] = ((int)status).ToString();
+            RewardCacheData = string.Join(",", data);
+        }
+
+        private void SetExtraInfo(string extraInfo)
+        {
+            ExtraInfo = extraInfo;
+            rewardCacheDataModel.ExtraInfo = extraInfo;
+        }
+
+        /// <summary>更新玩家上升額度資訊</summary>
+        public void UpdateRewardCacheData(string rewardCacheData, string extraInfo, GameServerCode server)
+        {
+            if (string.IsNullOrEmpty(rewardCacheData))
+            {
+                if (rewardCacheDebug && server == GameServerCode.Olympus1000Plus) MyConsole.WriteLine($"    玩家[{UserID}]沒有更新上升額度資訊");
+                return;
+            }
+
+            try
+            {
+                string[] data = rewardCacheData.Split(',');
+                if (data.Length < 3)
+                {
+                    if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]更新上升額度資訊失敗, 資料格式錯誤: {rewardCacheData}");
+                    return;
+                }
+
+                int rewardRecordId = int.Parse(data[0]);
+                RewardEndStatus rewardEndStatus = (RewardEndStatus)int.Parse(data[1]);
+
+                if (rewardRecordId <= 0 || rewardCacheDataModel == null)
+                {
+                    RewardCacheData = rewardCacheData; //只紀錄玩家身上的上升額度資訊 
+
+                    if (string.IsNullOrEmpty(extraInfo) == false)
+                    {
+                        SetExtraInfo(extraInfo);
+                    }
+                    //沒有有效的上升額度紀錄表, 不須回寫
+                    //MyConsole.WriteLine($"    玩家[{UserID}]沒有有效的上升額度紀錄表");
+                    return;
+                }
+
+                if (IsNewReRewardCacheData) //有新的上升額度紀錄表
+                {
+                    if (rewardCacheDataModel.RewardRecordId != rewardRecordId) //Serever回傳的上升額度紀錄表流水號, 不是目前的流水號
+                    {
+                        if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]上升額度 資訊已過時, 不可覆寫!");
+                        return;
+                    }
+
+                    if(rewardCacheDataModel.RewardEndStatus != RewardEndStatus.InProgress && rewardCacheDataModel.RewardEndStatus != rewardEndStatus)
+                    {
+                        if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]上升額度 功能狀態已過時, 不可覆寫!");
+                        return;
+                    }
+
+                    IsNewReRewardCacheData = false; //Server已經收到新的上升額度資訊
+                }
+
+                if (rewardCacheDataModel.RewardRecordId <= 0)
+                {
+                    if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]上升額度紀錄Session已結束, 不可覆寫!");
+                    return;
+                }
+
+                RewardCacheData = rewardCacheData;
+
+                if (string.IsNullOrEmpty(extraInfo) == false)
+                {
+                    SetExtraInfo(extraInfo);
+                }
+
+                if (rewardCacheDataModel.RewardEndStatus == RewardEndStatus.InProgress)
+                {
+                    if(rewardEndStatus != RewardEndStatus.InProgress)
+                    {
+                        if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]上升額度 功能狀態已結束, 不可覆寫!");
+                    }
+                }
+
+                SetRewardCacheDataModel(rewardRecordId, data);
+            }
+            catch (Exception ex)
+            {
+                if (rewardCacheDebug) Console.WriteLine($"    玩家[{UserID}]更新上升額度資訊Exception: {ex}");
+            }
+        }
+
+        void SetRewardCacheDataModel(int rewardRecordId, string[] data)
+        {
+            try
+            {
+                rewardCacheDataModel.RewardRecordId = rewardRecordId;
+                rewardCacheDataModel.RewardEndStatus = (RewardEndStatus)int.Parse(data[1]);
+                rewardCacheDataModel.TargetBalance = double.Parse(data[2]);
+
+                if (data.Length < 9)
+                {
+                    if (rewardCacheDebug) MyConsole.WriteLine($"    玩家[{UserID}]更新 rewardCacheDataModel, 沒有遊戲詳細紀錄資料");
+                    return;
+                }
+
+                rewardCacheDataModel.TotalGameCount = int.Parse(data[3]);
+                rewardCacheDataModel.TotalBet = double.Parse(data[4]);
+                rewardCacheDataModel.MaxBet = double.Parse(data[5]);
+                rewardCacheDataModel.MinBet = double.Parse(data[6]);
+                rewardCacheDataModel.MaxBalance = double.Parse(data[7]);
+                rewardCacheDataModel.MinBalance = double.Parse(data[8]);
+            }
+            catch (Exception ex)
+            {
+                if (rewardCacheDebug) Console.WriteLine($"    玩家[{UserID}]更新 SetRewardCacheDataModel Exception: {ex}");
+            }
+        }
+        #endregion
+
+
         #region H5 變數
         /// <summary>玩家H5錢包最後所在</summary>
         public Walletlocation Wallet { get; set; } = Walletlocation.none;
@@ -1171,6 +1483,7 @@ namespace DBCacheServer
             updata.Add(nameof(BetAverage), "'" + BetAverage + "'");
             updata.Add(nameof(ResultRec), "'" + ResultRec + "'");
             //updata.Add(nameof(ParaData), "'" + ParaData + "'");
+            updata.Add(nameof(RewardCacheData), "'" + RewardCacheData + "'");
 
             return updata;
         }

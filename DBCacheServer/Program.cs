@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using Org.BouncyCastle.Asn1.Cms;
 using Org.BouncyCastle.Asn1.Tsp;
 using Org.BouncyCastle.Math.Field;
+using PlayerKick.Contracts;
 using Protocol;
 using System;
 using System.Collections;
@@ -28,11 +29,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Web;
+using UserSessionReward.Core.Models;
 using VerProtocol;
 using VnpayAPI;
 using static DBCacheServer.CacheManeger;
 using static System.Net.Mime.MediaTypeNames;
-using PlayerKick.Contracts;
 
 
 namespace DBCacheServer
@@ -8474,6 +8475,21 @@ namespace DBCacheServer
                                                                                                 userKeyMode = 0;
                                                                                                 //更新玩家DB資料
                                                                                                 DBCache.UpdateUserBalance(dealAmount, userUid, CacheManeger.UpdateBalanceSource.Web); //PlayerBalanceDeal
+
+                                                                                                //建立玩家新的上升額度 Session上升額度
+                                                                                                if (isKEYIN)
+                                                                                                {
+                                                                                                    RewardCacheDataModel rewardCacheData = DBCache.CreateSession(Userdata, userUid, dealAmount, beforeBalance, Userdata.RewardWebSetting);
+                                                                                                    Userdata.CreateNewRewardCacheData(rewardCacheData, dealAmount);
+                                                                                                    DBCache.AddUserdataUpdateList(userUid);
+                                                                                                }
+                                                                                                else //is KeyOut
+                                                                                                {
+                                                                                                    if (Userdata.rewardCacheDataModel.RewardRecordId > 0)
+                                                                                                    {
+                                                                                                        DBCache.RecordKeyOut(userUid, Userdata.rewardCacheDataModel.RewardRecordId, -dealAmount, beforeBalance);
+                                                                                                    }
+                                                                                                }
                                                                                             }
                                                                                             #endregion
 
@@ -13001,38 +13017,7 @@ namespace DBCacheServer
                                                                     else if (webCommand == "ServerCommand") //發命令給Server
                                                                     {
                                                                         MyConsole.WriteLine($"收到 Web 發來的 Command : {RicevieData.webInfo.AwardResult}");
-
-                                                                        //回傳給Web
-                                                                        GameData sendData = new()
-                                                                        {
-                                                                            errorCode = ErrorCode.Ok,
-                                                                            operationCode = OperationCode.Web,
-                                                                            RewardResult = "DBCache OK",
-                                                                        };
-                                                                        m_ListenWebServerSocket.SendMessage(token, Message.SerializrToStream(sendData));
-
-                                                                        //GameServerCode gServer = RicevieData.webInfo.GameName;
-                                                                        //GameServerCode gServer = GameServerCode.ModernValhalla;
-                                                                        //
-                                                                        //if (gServer == GameServerCode.None)
-                                                                        //{
-                                                                        //    //未指定GameServer, 是給DBCache的
-                                                                        //
-                                                                        //
-                                                                        //}
-                                                                        //else
-                                                                        //{
-                                                                        //    //轉發給指定GameServer
-                                                                        //    AsyncUserToken temptoken = m_ListenGameServerSocket.AsyncGameServers.GetGameTokenbyGameType(gServer);
-                                                                        //    if (temptoken != null)
-                                                                        //    {
-                                                                        //
-                                                                        //    }
-                                                                        //    else
-                                                                        //    {
-                                                                        //        MyConsole.WriteLine($"ServerCommand : 找不到指定的GameServer[{gServer}]");
-                                                                        //    }
-                                                                        //}
+                                                                        ServerCommand(token, RicevieData);
                                                                     }
                                                                     else if (webCommand == "WebGameLogin") //發命令給Server
                                                                     {
@@ -13296,6 +13281,104 @@ namespace DBCacheServer
 
                 Thread.Sleep(1);
             }
+        }
+
+        /// <summary>接收後台ServerCommand</summary>
+        static void ServerCommand(AsyncUserToken token, GameData ricevieData)
+        {
+            string response = ""; //回覆字串, 會秀在後台頁面上的訊息
+
+            if (ricevieData.webInfo.AwardResult == "hello")
+            {
+                response = $"DBCache:hello!";
+            }
+            else if (ricevieData.webInfo.AwardResult == "ConnectedGameServer")
+            {
+                response = $"ConnectedGameServer[{m_ListenGameServerSocket.AsyncGameServers.ConnectedGameServer.Count}]";
+            }
+            else if (ricevieData.webInfo.AwardResult.StartsWith("session:"))
+            {
+                //#260821
+                string userid = ricevieData.webInfo.AwardResult.Substring("session:".Length);
+
+                if (int.TryParse(userid, out int userUid))
+                {
+                    var userSessionRecord = DBCache.GetInProgressSession(userUid);
+                    if (userSessionRecord != null)
+                    {
+                        response = $"玩家 {userid} 進行中的 Session: {userSessionRecord.RewardRecordId}, 開始時間: {userSessionRecord.StartTime}, 結束時間: {userSessionRecord.EndTime}";
+                    }
+                    else
+                    {
+                        response = $"玩家 {userid} 沒有進行中的 Session";
+                    }
+                }
+                else
+                {
+                    response = $"Invalid UserUID: {userid}";
+                }
+            }
+            else if (ricevieData.webInfo.AwardResult.StartsWith("setoff:"))
+            {
+                //將 AwardResult 開頭字串 "setoff" 移除
+                string userid = ricevieData.webInfo.AwardResult.Substring("setoff:".Length);
+
+                //判斷 userid 是否為數字
+                if (int.TryParse(userid, out int userUid))
+                {
+                    UserData tempUser = DBCache.Getuser(userUid);
+                    if (tempUser != null)
+                    {
+                        if (tempUser.rewardCacheDataModel.RewardRecordId > 0)
+                        {
+                            UserSessionRewardRecord session = DBCache.GetInProgressSession(userUid);
+                            if (session != null)
+                            {
+                                tempUser.ApplyWebForceClose(session);
+                                SessionOperationResult sessionOperationResult = DBCache.UpdateSession(userUid, tempUser.rewardCacheDataModel, tempUser.UserBalance);
+                                if (sessionOperationResult.IsSuccessful)
+                                {
+                                    DBCache.AddUserdataUpdateList(userUid);
+                                    response = $"關閉玩家 {tempUser.UserID} 上升額度功能成功";
+                                }
+                                else
+                                {
+                                    response = $"關閉玩家 {tempUser.UserID} 上升額度功能失敗 {sessionOperationResult.Message}";
+                                }
+                            }
+                            else
+                            {
+                                response = $"玩家 {tempUser.UserID} 沒有執行中 SESSION";
+                            }
+                        }
+                        else
+                        {
+                            response = $"玩家 {tempUser.UserID} 沒有執行中 SESSION";
+                        }
+                    }
+                    else
+                    {
+                        response = $"結束玩家 {userUid} SESSION 失敗 : User not found";
+                    }
+                }
+                else
+                {
+                    response = $"Invalid UserUID: {userid}";
+                }
+            }
+            else
+            {
+                response = "Unknow Command!";
+            }
+
+            //回傳給Web端
+            GameData sendData = new()
+            {
+                errorCode = ErrorCode.Ok,
+                operationCode = OperationCode.Web,
+                RewardResult = response
+            };
+            m_ListenWebServerSocket.SendMessage(token, Message.SerializrToStream(sendData));
         }
 
         /// <summary>製作玩家登入回應封包 (DB->Login->Client)</summary>

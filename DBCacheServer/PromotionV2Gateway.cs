@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Promotion.Core.Data;
 using Promotion.Data.MySql;
-using AdapterException = global::Promotion.Core.Data.PromotionDataException;
+using AdapterException = Promotion.Core.Data.PromotionDataException;
 
 namespace DBCacheServer
 {

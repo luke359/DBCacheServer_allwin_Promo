@@ -147,6 +147,10 @@ namespace DBCacheServer
         DeepSeaWitch pDeepSeaWitch = new();
         MuseumHeist2 pMuseumHeist2 = new();
         UrbansCannon pUrbansCannon = new();
+        Olympus1000Plus pOlympus1000Plus = new();
+        HangTuah pHangTuah = new();
+        SetAwakened pSetAwakened = new();
+        Nusantara pNusantara = new();
 
         //OceanKing8 pOceanKing8 = new();
 
@@ -183,6 +187,10 @@ namespace DBCacheServer
             GameServerCodeTable.Add(GameServerCode.DeepSeaWitch, pDeepSeaWitch);
             GameServerCodeTable.Add(GameServerCode.MuseumHeist2, pMuseumHeist2);
             GameServerCodeTable.Add(GameServerCode.UrbansCannon, pUrbansCannon);
+            GameServerCodeTable.Add(GameServerCode.Olympus1000Plus, pOlympus1000Plus);
+            GameServerCodeTable.Add(GameServerCode.HangTuah, pHangTuah);
+            GameServerCodeTable.Add(GameServerCode.SetAwakened, pSetAwakened);
+            GameServerCodeTable.Add(GameServerCode.Nusantara, pNusantara);
 
             //魚機
             //GameServerCodeTable.Add(GameServerCode.OceanKing8, pOceanKing8);

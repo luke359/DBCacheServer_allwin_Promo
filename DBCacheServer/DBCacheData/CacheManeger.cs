@@ -1,8 +1,9 @@
-﻿using Protocol;
+﻿using MySql.Data.MySqlClient;
+using Protocol;
+using StackExchange.Redis;
 using System;
-using System.Collections.Generic;
-using MySql.Data.MySqlClient;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Diagnostics;
@@ -21,7 +22,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Web;
-using StackExchange.Redis;
+using UserSessionReward.Core.Models;
 using VerProtocol;
 using VnpayAPI;
 
@@ -3851,6 +3852,10 @@ namespace DBCacheServer
                         user.KeyInAward = true;
                         user.KeyOutLimit = true;
                     }
+
+                    //建立玩家新的上升額度 #260821
+                    bool isKeyin = detail.OperationMode == BatchDepositV2OperationMode.Deposit;
+                    CreateRewardSession(user, isKeyin,  detail.RequestAmount, detail.BeforeBalance);
                 }
                 UpdateKeyInOutRec(user, (double)detail.RequestAmount);
             }
@@ -4076,6 +4081,9 @@ namespace DBCacheServer
 
                 string note = update.ContainsKey("Note") ? update["Note"] : "";
 
+                string rewardCacheData = update.ContainsKey("RewardCacheData") ? update["RewardCacheData"] : "";
+                string extraInfo = update.ContainsKey("ExtraInfo") ? update["ExtraInfo"] : "";
+
                 int playTimes = 1; //遊玩局數預設為1
 
                 UserData user = null;
@@ -4084,10 +4092,15 @@ namespace DBCacheServer
                 {
                     if (UserDataList.ContainsKey(userUid))
                     {
-                        UserDataList[userUid].CountIpInfo(totBet, totWin, playTimes, waterColl, waterInTake, waterOutTake, calcData, calcDataIndep, betAverage, resultRec);
+                        user = UserDataList[userUid];
+                        user.CountIpInfo(totBet, totWin, playTimes, waterColl, waterInTake, waterOutTake, calcData, calcDataIndep, betAverage, resultRec);
+                        user.UpdateRewardCacheData(rewardCacheData, extraInfo, server);
                         AddUserdataUpdateList(userUid);
 
-                        user = UserDataList[userUid];
+                        if (user.rewardCacheDataModel != null && user.rewardCacheDataModel.RewardRecordId > 0)
+                        {
+                            UpdateSession(userUid, user.rewardCacheDataModel, user.UserBalance);
+                        }
                     }
                 }
 
@@ -4119,6 +4132,29 @@ namespace DBCacheServer
             {
                 string log = $"UpdateUserIpInfo [{server}] Error: 1513";
                 Console.WriteLine(log);
+            }
+        }
+
+        /// <summary>開分時 建立玩家新的上升額度</summary>
+        public void CreateRewardSession(UserData Userdata, bool isKEYIN, decimal _dealAmount, decimal _beforeBalance)
+        {
+            //#260821
+            int userUid = Userdata.UserUID;
+            double dealAmount = Convert.ToDouble(_dealAmount);
+            double beforeBalance = Convert.ToDouble(_beforeBalance);
+            //建立玩家新的上升額度 Session上升額度
+            if (isKEYIN)
+            {
+                RewardCacheDataModel rewardCacheData = CreateSession(Userdata, userUid, dealAmount, beforeBalance, Userdata.RewardWebSetting);
+                Userdata.CreateNewRewardCacheData(rewardCacheData, dealAmount);
+                AddUserdataUpdateList(userUid);
+            }
+            else //is KeyOut
+            {
+                if (Userdata.rewardCacheDataModel.RewardRecordId > 0)
+                {
+                    RecordKeyOut(userUid, Userdata.rewardCacheDataModel.RewardRecordId, -dealAmount, beforeBalance);
+                }
             }
         }
 
