@@ -49,7 +49,7 @@ namespace DBCacheServer
         Burmese,        //緬甸文
     }
 
-    class Program
+    partial class Program
     {
         private static Mutex db_mutex = null;    //多線程時互斥鎖
 
