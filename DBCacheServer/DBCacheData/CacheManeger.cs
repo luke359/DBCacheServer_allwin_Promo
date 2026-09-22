@@ -1,4 +1,6 @@
 ﻿using MySql.Data.MySqlClient;
+using MySqlX.XDevAPI.Common;
+using Promotion.Core.Contracts;
 using Protocol;
 using StackExchange.Redis;
 using System;
@@ -499,6 +501,7 @@ namespace DBCacheServer
             GetCountrySetting(); //2.先取地區設定
             GetDBEntityData();   //3.再取代理商設定
             GetDBUserData();    //4.最後取玩家設定, 這4個順序不可變更
+            PromotionCoreHost.BuildAndInitialize(GetPromotionBusinessDayCutover()); //優惠活動 開機init #260922 
             InitEntityOk = true;
 
             GetDBMachineData(); //machineDataList 最後要廢掉 //sroptim
@@ -1756,6 +1759,12 @@ namespace DBCacheServer
 
         int lastDay = 0; //初始設無效值, 以保證開機時第一次呼叫可以進去
         /// <summary>每日跨日判斷</summary>
+        /// <summary>優惠活動日切換時間。以後改由 Country 提供的方法取得。</summary>
+        TimeSpan GetPromotionBusinessDayCutover()
+        {
+            return TimeSpan.FromHours(8);
+        }
+
         public bool CountryOverDayJudge()
         {
             DateTime nowDay = DateTime.Now;
@@ -3842,9 +3851,11 @@ namespace DBCacheServer
             foreach (var detail in result.Details)
             {
                 UserData user;
+                int entityUid = 0;
                 lock (UserDataList)
                 {
                     if (!UserDataList.TryGetValue(detail.UserUID, out user)) continue;
+                    entityUid = user.EntityId;
                     user.UserBalance = (double)detail.AfterBalance;
                     user.SessionID = detail.SessionId;
                     if (detail.ExtraBonus > 0)
@@ -3858,6 +3869,18 @@ namespace DBCacheServer
                     CreateRewardSession(user, isKeyin,  detail.RequestAmount, detail.BeforeBalance);
                 }
                 UpdateKeyInOutRec(user, (double)detail.RequestAmount);
+
+                //優惠活動 玩家儲值成功 #260922 
+                if (detail.OperationMode == BatchDepositV2OperationMode.Deposit && detail.RequestAmount > 0)
+                {
+                    bool isFirstDepositOfBusinessDay = false; //TODO: 之後改為真正的當日首儲判斷
+                    PromotionCoreHost.TryCreateDepositEligibility(
+                        detail.UserUID,
+                        entityUid,
+                        "dep-" + result.BatchId + "-" + detail.DetailSequence.ToString(),
+                        detail.RequestAmount,
+                        isFirstDepositOfBusinessDay);
+                }
             }
         }
 
@@ -4108,6 +4131,10 @@ namespace DBCacheServer
                 {
                     //回傳最新的IP資訊
                     ipInfoReturn.Add(user.GetIpInfoGameResult(server));
+
+                    //優惠活動 累計流水 #260922
+                    //UNDONE: 這裡需要將優惠活動的流水資訊傳回 GameServer->Client 
+                    PromotionAccumulateWager(user, totBet, totWin);
 
                     //玩家抽放水記錄
                     if (waterInTake != 0)

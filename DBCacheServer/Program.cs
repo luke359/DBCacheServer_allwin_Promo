@@ -9494,6 +9494,7 @@ namespace DBCacheServer
                                                                                 if (!IsBroken && newUserUID > 0)
                                                                                 {
                                                                                     UserData Userdata = DBCache.Getuser(newUserUID);
+                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, RicevieData.webInfo.CreateInfo.EntityUID); //優惠活動 玩家註冊成功 #260922 
                                                                                     //====================== 寫紀錄至DB ======================================
                                                                                     if (RicevieData.webInfo.CreateInfo.Balance > 0)
                                                                                     {
@@ -9650,6 +9651,7 @@ namespace DBCacheServer
                                                                                 if (!IsBroken && newUserUID > 0)
                                                                                 {
                                                                                     UserData Userdata = DBCache.Getuser(newUserUID);
+                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, RicevieData.webInfo.CreateInfo.EntityUID); //優惠活動 玩家註冊成功 #260922 
                                                                                     //====================== 寫紀錄至DB ======================================
                                                                                     if (RicevieData.webInfo.CreateInfo.Balance > 0)
                                                                                     {
@@ -13091,6 +13093,9 @@ namespace DBCacheServer
                                                                                                                     //DBCache.PGSTransferOutPlayerBalance(tempUserData.UserUID);
                                                                                                                     AddPGSTransTask(tempUserData.UserUID);
                                                                                                                 }
+
+                                                                                                                //優惠活動 玩家登入 #260922
+                                                                                                                PromotionCoreHost.TryCreateFirstLoginEligibility(tempUserData.UserUID, tempUserData.EntityId);
 
                                                                                                                 GameData sendData = LoginGameDataMake(tempUserData, entity, RicevieData);
 
