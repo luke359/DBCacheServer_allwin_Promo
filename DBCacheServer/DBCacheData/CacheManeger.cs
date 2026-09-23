@@ -3873,13 +3873,11 @@ namespace DBCacheServer
                 //優惠活動 玩家儲值成功 #260922 
                 if (detail.OperationMode == BatchDepositV2OperationMode.Deposit && detail.RequestAmount > 0)
                 {
-                    bool isFirstDepositOfBusinessDay = false; //TODO: 之後改為真正的當日首儲判斷
                     PromotionCoreHost.TryCreateDepositEligibility(
                         detail.UserUID,
                         entityUid,
                         "dep-" + result.BatchId + "-" + detail.DetailSequence.ToString(),
-                        detail.RequestAmount,
-                        isFirstDepositOfBusinessDay);
+                        detail.RequestAmount);
                 }
             }
         }

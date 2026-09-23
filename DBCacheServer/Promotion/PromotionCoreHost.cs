@@ -203,7 +203,7 @@ namespace DBCacheServer
             }
         }
 
-        /// <summary>玩家登入成功後建立當日首次登入資格。同一營業日重送沿用 login-{UserUID}-{yyyyMMdd}。</summary>
+        /// <summary>玩家登入成功後送出每日首登候選。是否為當日首次由核心依 EventTime 所屬營業日判斷。</summary>
         public static void TryCreateFirstLoginEligibility(int userUid, int entityUid)
         {
             if (!ready || service == null || userUid <= 0)
@@ -212,14 +212,8 @@ namespace DBCacheServer
             try
             {
                 IReadOnlyList<long> allowed = GetAllowedActivityUids(entityUid);
-                if (allowed.Count == 0)
-                    return;
-
-                DateTime now = DateTime.Now;
-                TimeSpan cutover = GetBusinessDayCutover();
-                DateOnly businessDay = DateOnly.FromDateTime(now - cutover);
-                DateTime eventTime = businessDay.ToDateTime(TimeOnly.FromTimeSpan(cutover));
-                string eventId = "login-" + userUid.ToString() + "-" + businessDay.ToString("yyyyMMdd");
+                DateTime eventTime = DateTime.Now;
+                string eventId = "login-" + userUid.ToString() + "-" + Guid.NewGuid().ToString("N");
                 TryCreateEligibility(
                     userUid, eventId, TriggerType.FirstLoginOfBusinessDay, eventTime, null, allowed);
             }
@@ -229,9 +223,9 @@ namespace DBCacheServer
             }
         }
 
-        /// <summary>玩家儲值成功後建立儲值觸發資格。isFirstDepositOfBusinessDay 為 true 時另建當日首儲資格。</summary>
+        /// <summary>玩家儲值成功後建立一般儲值資格，並另送每日首儲候選。是否為當日首次由核心判斷。</summary>
         public static void TryCreateDepositEligibility(
-            int userUid, int entityUid, string eventId, decimal depositAmount, bool isFirstDepositOfBusinessDay)
+            int userUid, int entityUid, string eventId, decimal depositAmount)
         {
             if (!ready || service == null || userUid <= 0 || depositAmount <= 0 || string.IsNullOrWhiteSpace(eventId))
                 return;
@@ -239,20 +233,13 @@ namespace DBCacheServer
             try
             {
                 IReadOnlyList<long> allowed = GetAllowedActivityUids(entityUid);
-                if (allowed.Count == 0)
-                    return;
-
                 DateTime eventTime = DateTime.Now;
                 string depositEventId = eventId.Trim();
                 TryCreateEligibility(
                     userUid, depositEventId, TriggerType.Deposit, eventTime, depositAmount, allowed);
-
-                if (isFirstDepositOfBusinessDay)
-                {
-                    TryCreateEligibility(
-                        userUid, "f" + depositEventId, TriggerType.FirstDepositOfBusinessDay,
-                        eventTime, depositAmount, allowed);
-                }
+                TryCreateEligibility(
+                    userUid, "f" + depositEventId, TriggerType.FirstDepositOfBusinessDay,
+                    eventTime, depositAmount, allowed);
             }
             catch (Exception ex)
             {
