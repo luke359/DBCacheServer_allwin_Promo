@@ -464,6 +464,9 @@ namespace DBCacheServer
             //返水 #250807
             RebateGetDBData(datalist);
 
+            //優惠活動 #260922
+            PromotionGetDBData(datalist);
+
             //平台
             GetPlatformNameData(datalist);
 
@@ -1612,6 +1615,42 @@ namespace DBCacheServer
 
             if (RebateValue5 > targetPers) return RebateValue5;
             return targetPers;
+        }
+        #endregion
+
+
+        #region 返水 //優惠活動 #260922
+        /// <summary>代理商優惠啟用開關</summary>
+        public bool PromotionFg { get; private set; } = false;
+        /// <summary>代理商優惠列表</summary>
+        string ActivityUIDList = "";
+
+        void PromotionGetDBData(Dictionary<string, string> datalist)
+        {
+            try
+            {
+                if (datalist.ContainsKey("PromotionFg"))
+                {
+                    PromotionFg = Convert.ToBoolean(datalist["PromotionFg"]);
+                    ActivityUIDList = datalist["ActivityUIDList"];
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                MyConsole.WriteLine($"  代理商[{Name}({EntityId})]無優惠設定");
+            }
+
+            PromotionFg = false;
+            ActivityUIDList = "";
+        }
+
+        /// <summary>取得優惠列表</summary>
+        public string GetActivityUIDList()
+        {
+            if (!PromotionFg) return "";
+
+            return ActivityUIDList;
         }
         #endregion
     }

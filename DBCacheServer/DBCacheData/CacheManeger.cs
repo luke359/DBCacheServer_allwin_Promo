@@ -3851,11 +3851,10 @@ namespace DBCacheServer
             foreach (var detail in result.Details)
             {
                 UserData user;
-                int entityUid = 0;
                 lock (UserDataList)
                 {
                     if (!UserDataList.TryGetValue(detail.UserUID, out user)) continue;
-                    entityUid = user.EntityId;
+
                     user.UserBalance = (double)detail.AfterBalance;
                     user.SessionID = detail.SessionId;
                     if (detail.ExtraBonus > 0)
@@ -3873,9 +3872,11 @@ namespace DBCacheServer
                 //優惠活動 玩家儲值成功 #260922 
                 if (detail.OperationMode == BatchDepositV2OperationMode.Deposit && detail.RequestAmount > 0)
                 {
+                    EntityData entity = GetEntityData(user.EntityId);
+
                     PromotionCoreHost.TryCreateDepositEligibility(
                         detail.UserUID,
-                        entityUid,
+                        entity?.GetActivityUIDList(),
                         "dep-" + result.BatchId + "-" + detail.DetailSequence.ToString(),
                         detail.RequestAmount);
                 }

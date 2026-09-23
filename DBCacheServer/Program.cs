@@ -9494,7 +9494,9 @@ namespace DBCacheServer
                                                                                 if (!IsBroken && newUserUID > 0)
                                                                                 {
                                                                                     UserData Userdata = DBCache.Getuser(newUserUID);
-                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, RicevieData.webInfo.CreateInfo.EntityUID); //優惠活動 玩家註冊成功 #260922 
+                                                                                    EntityData entity = DBCache.GetEntityData(RicevieData.webInfo.CreateInfo.EntityUID);
+                                                                                    //優惠活動 玩家註冊成功 #260922 
+                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, entity?.GetActivityUIDList());
                                                                                     //====================== 寫紀錄至DB ======================================
                                                                                     if (RicevieData.webInfo.CreateInfo.Balance > 0)
                                                                                     {
@@ -9651,7 +9653,9 @@ namespace DBCacheServer
                                                                                 if (!IsBroken && newUserUID > 0)
                                                                                 {
                                                                                     UserData Userdata = DBCache.Getuser(newUserUID);
-                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, RicevieData.webInfo.CreateInfo.EntityUID); //優惠活動 玩家註冊成功 #260922 
+                                                                                    EntityData entity = DBCache.GetEntityData(RicevieData.webInfo.CreateInfo.EntityUID);
+                                                                                    //優惠活動 玩家註冊成功 #260922 
+                                                                                    PromotionCoreHost.TryCreateRegistrationEligibility(newUserUID, entity?.GetActivityUIDList());
                                                                                     //====================== 寫紀錄至DB ======================================
                                                                                     if (RicevieData.webInfo.CreateInfo.Balance > 0)
                                                                                     {
@@ -13095,7 +13099,9 @@ namespace DBCacheServer
                                                                                                                 }
 
                                                                                                                 //優惠活動 玩家登入 #260922
-                                                                                                                PromotionCoreHost.TryCreateFirstLoginEligibility(tempUserData.UserUID, tempUserData.EntityId);
+                                                                                                                PromotionCoreHost.TryCreateFirstLoginEligibility(tempUserData.UserUID, entity.GetActivityUIDList());
+                                                                                                                //優惠活動 免費活動 #260922
+                                                                                                                PromotionCoreHost.TryCreateFreeEligibility(tempUserData.UserUID, entity.GetActivityUIDList());
 
                                                                                                                 GameData sendData = LoginGameDataMake(tempUserData, entity, RicevieData);
 

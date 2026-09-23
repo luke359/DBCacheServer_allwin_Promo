@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using Promotion.Core;
 using Promotion.Core.Contracts;
@@ -168,14 +169,14 @@ namespace DBCacheServer
         }
 
         /// <summary>玩家註冊成功後建立註冊觸發資格。未就緒、無允許活動或呼叫失敗時不影響建帳。</summary>
-        public static void TryCreateRegistrationEligibility(int userUid, int entityUid)
+        public static void TryCreateRegistrationEligibility(int userUid, string activityUidList)
         {
             if (!ready || service == null || userUid <= 0)
                 return;
 
             try
             {
-                IReadOnlyList<long> allowed = GetAllowedActivityUids(entityUid);
+                IReadOnlyList<long> allowed = GetAllowedActivityUids(activityUidList);
                 if (allowed.Count == 0)
                     return;
 
@@ -204,14 +205,14 @@ namespace DBCacheServer
         }
 
         /// <summary>玩家登入成功後送出每日首登候選。是否為當日首次由核心依 EventTime 所屬營業日判斷。</summary>
-        public static void TryCreateFirstLoginEligibility(int userUid, int entityUid)
+        public static void TryCreateFirstLoginEligibility(int userUid, string activityUidList)
         {
             if (!ready || service == null || userUid <= 0)
                 return;
 
             try
             {
-                IReadOnlyList<long> allowed = GetAllowedActivityUids(entityUid);
+                IReadOnlyList<long> allowed = GetAllowedActivityUids(activityUidList);
                 DateTime eventTime = DateTime.Now;
                 string eventId = "login-" + userUid.ToString() + "-" + Guid.NewGuid().ToString("N");
                 TryCreateEligibility(
@@ -223,16 +224,42 @@ namespace DBCacheServer
             }
         }
 
+        /// <summary>登入成功後建立免費活動資格。同一營業日沿用 free-{UserUID}-{yyyyMMdd}；已有事件則略過。</summary>
+        public static void TryCreateFreeEligibility(int userUid, string activityUidList)
+        {
+            if (!ready || service == null || gateway == null || userUid <= 0)
+                return;
+
+            try
+            {
+                IReadOnlyList<long> allowed = GetAllowedActivityUids(activityUidList);
+                if (allowed.Count == 0)
+                    return;
+
+                DateTime eventTime = DateTime.Now;
+                DateOnly businessDay = DateOnly.FromDateTime(eventTime - GetBusinessDayCutover());
+                string eventId = "free-" + userUid.ToString() + "-" + businessDay.ToString("yyyyMMdd");
+                if (TriggerEventExists(eventId))
+                    return;
+
+                TryCreateEligibility(userUid, eventId, TriggerType.Free, eventTime, null, allowed);
+            }
+            catch (Exception ex)
+            {
+                MyConsole.WriteLine("Promotion 免費活動資格建立例外：UserUID=" + userUid + " " + ex.Message);
+            }
+        }
+
         /// <summary>玩家儲值成功後建立一般儲值資格，並另送每日首儲候選。是否為當日首次由核心判斷。</summary>
         public static void TryCreateDepositEligibility(
-            int userUid, int entityUid, string eventId, decimal depositAmount)
+            int userUid, string activityUidList, string eventId, decimal depositAmount)
         {
             if (!ready || service == null || userUid <= 0 || depositAmount <= 0 || string.IsNullOrWhiteSpace(eventId))
                 return;
 
             try
             {
-                IReadOnlyList<long> allowed = GetAllowedActivityUids(entityUid);
+                IReadOnlyList<long> allowed = GetAllowedActivityUids(activityUidList);
                 DateTime eventTime = DateTime.Now;
                 string depositEventId = eventId.Trim();
                 TryCreateEligibility(
@@ -335,29 +362,45 @@ namespace DBCacheServer
             }
         }
 
-        /// <summary>目前回傳全部活動 ID。Entity 指定名單完成後只改此方法。</summary>
-        private static IReadOnlyList<long> GetAllowedActivityUids(int entityUid)
+        private static bool TriggerEventExists(string eventId)
         {
-            List<long> ids = new List<long>();
-            int offset = 0;
-            const int pageSize = 1000;
-            while (true)
+            Query query = new Query(
+                PromotionTableMetadata.Event,
+                new[] { "EventId" },
+                new[] { new Condition("EventId", Comparison.Equal, eventId) },
+                Array.Empty<Sort>(),
+                1);
+            return gateway.Select(query).Count > 0;
+        }
+
+        /// <summary>
+        /// 解析逗號分隔的 ActivityUID 名單。null、空字串或僅空白視為無優惠。
+        /// 任一非空白片段無法轉成 long 時記錄錯誤，整份名單視為無優惠可用。
+        /// </summary>
+        private static IReadOnlyList<long> GetAllowedActivityUids(string activityUidList)
+        {
+            if (string.IsNullOrWhiteSpace(activityUidList))
+                return Array.Empty<long>();
+
+            string[] parts = activityUidList.Split(',');
+            List<long> ids = new List<long>(parts.Length);
+            for (int i = 0; i < parts.Length; i++)
             {
-                Query query = new Query(
-                    PromotionTableMetadata.Activity,
-                    new[] { "ActivityUID" },
-                    Array.Empty<Condition>(),
-                    new[] { new Sort("ActivityUID") },
-                    pageSize,
-                    offset,
-                    false);
-                IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = gateway.Select(query);
-                for (int i = 0; i < rows.Count; i++)
-                    ids.Add(Convert.ToInt64(rows[i]["ActivityUID"]));
-                if (rows.Count < pageSize)
-                    break;
-                offset += pageSize;
+                string token = parts[i].Trim();
+                if (token.Length == 0)
+                    continue;
+
+                if (!long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id))
+                {
+                    MyConsole.WriteLine(
+                        "Promotion 活動名單解析失敗，視為無優惠可用：token=" + token
+                        + " ActivityUIDList=" + activityUidList);
+                    return Array.Empty<long>();
+                }
+
+                ids.Add(id);
             }
+
             return ids;
         }
 
