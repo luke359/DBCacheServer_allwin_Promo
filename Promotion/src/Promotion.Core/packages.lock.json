@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net6.0": {
+      "promotion.core.contracts": {
+        "type": "Project"
+      }
+    }
+  }
+}
