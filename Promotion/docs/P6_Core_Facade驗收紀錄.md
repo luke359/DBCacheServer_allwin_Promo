@@ -1,6 +1,6 @@
 # P6 Core Facade 驗收紀錄
 
-更新日期：2026-09-17。狀態：P6 本機核心服務實作與階段驗收完成；P7 Host 接線及 P8 全案例驗收另行進行。
+更新日期：2026-09-24。狀態：P6 本機核心服務實作與階段驗收完成；P7 的 DBCache Host 組合根與業務接線位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`，P8 全案例驗收另行進行。
 
 ## 實作範圍
 
@@ -18,5 +18,5 @@
 
 ## 後續階段
 
-- P7 將接上 DBCache Request Adapter、可靠保存 Wallet Instruction、Dispatcher 與對帳；在此之前不得啟用優惠業務入口。
+- P7 的 DBCache Request Adapter 與核心初始化已整合於 `DBCacheServer/Promotion/PromotionCoreHost.cs`；Wallet Instruction 的可靠保存、Dispatcher 與對帳仍須依實際 DBCache 流程完成與驗證。
 - P8 依 PCS-06 逐項執行完整案例矩陣及 50 回併發壓力驗證。DEC-001 正式 MySQL／Provider 版本簽核與既有 `net6.0` 套件支援警告仍須在正式部署前處理。

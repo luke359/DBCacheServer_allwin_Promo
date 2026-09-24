@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -1678,6 +1678,173 @@ namespace WebProtocol
             Message = "";
             Data = new Dictionary<string, string>();
         }
+    }
+
+    // 優惠活動 SignalR 回覆；DBCache 到 Game Server 仍使用 CommonInfoData。
+    [Serializable]
+    public class PromoResponseBase
+    {
+        public int UserUID;
+        public string RequestId = "";
+        public bool Success;
+        public bool IsMock;
+        public string ErrorCode = "";
+        public string Message = "";
+    }
+
+    [Serializable]
+    public class PromoActivityItem
+    {
+        public long ActivityUID;
+        public string ActivityInfo = "";
+        public string TriggerType = "";
+        public string BonusType = "";
+        public int? FixedBonusAmount;
+        public int? DepositPercentage;
+        public int? MaxBonusAmount;
+        public int? MinimumDepositAmount;
+        public int WagerMultiplier;
+        public int DailyClaimLimit;
+    }
+
+    [Serializable]
+    public class PromoAvailableOfferItem
+    {
+        public long EligibilityEntryId;
+        public long ActivityUID;
+        public string EventId = "";
+        public string ActivityInfo = "";
+        public string TriggerType = "";
+        public decimal? EligibleDepositAmount;
+        public decimal EstimatedBonusAmount;
+        public decimal EstimatedRequiredWagerAmount;
+        public int? MaxBetAmount;
+    }
+
+    [Serializable]
+    public class PromoClaimedOfferItem
+    {
+        public long EligibilityEntryId;
+        public string BonusTaskId = "";
+        public long ActivityUID;
+        public string ActivityInfo = "";
+        public decimal BonusAmount;
+        public string ClaimedAt = "";
+        public string TaskState = "";
+        public string CloseReason = "";
+    }
+
+    [Serializable]
+    public class PromoTaskInfo
+    {
+        public string BonusTaskId = "";
+        public long EligibilityEntryId;
+        public long ActivityUID;
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal RemainingWagerAmount;
+        public string UnlockMode = "";
+        public bool CanClaimUnlock;
+        public decimal? EstimatedUnlockAmount;
+        public int? MaxBetAmount;
+        public string ClaimedAt = "";
+    }
+
+    [Serializable]
+    public class PromoHistoryItem
+    {
+        public long BonusHistoryId;
+        public string BonusTaskId = "";
+        public long ActivityUID;
+        public string ActivityInfo = "";
+        public string BusinessDay = "";
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal ConvertedAmount;
+        public string CloseReason = "";
+        public string ClaimedAt = "";
+        public string ClosedAt = "";
+    }
+
+    [Serializable]
+    public class PromoGetActivitiesResponse : PromoResponseBase
+    {
+        public string BusinessDay = "";
+        public List<PromoActivityItem> Items = new List<PromoActivityItem>();
+    }
+
+    [Serializable]
+    public class PromoGetPlayerOffersResponse : PromoResponseBase
+    {
+        public string BusinessDay = "";
+        public List<PromoAvailableOfferItem> AvailableItems = new List<PromoAvailableOfferItem>();
+        public List<PromoClaimedOfferItem> ClaimedItems = new List<PromoClaimedOfferItem>();
+        public bool HasActiveBonusTask;
+        public string ActiveBonusTaskId = "";
+    }
+
+    [Serializable]
+    public class PromoGetGamesResponse : PromoResponseBase
+    {
+        public long ActivityUID;
+        public string GameServerList = "";
+    }
+
+    [Serializable]
+    public class PromoClaimResponse : PromoResponseBase
+    {
+        public long EligibilityEntryId;
+        public string BonusTaskId = "";
+        public long ActivityUID;
+        public string BusinessDay = "";
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal RemainingWagerAmount;
+        public int? MaxBetAmount;
+        public string ClaimedAt = "";
+        public bool IsReplay;
+    }
+
+    [Serializable]
+    public class PromoGetTaskResponse : PromoResponseBase
+    {
+        public bool HasActiveTask;
+        public PromoTaskInfo Task;
+    }
+
+    [Serializable]
+    public class PromoClaimUnlockResponse : PromoResponseBase
+    {
+        public string BonusTaskId = "";
+        public decimal FinalCurrentWagerAmount;
+        public decimal ConvertedAmount;
+        public string ClosedAt = "";
+        public bool IsReplay;
+        public string WalletStatus = "";
+    }
+
+    [Serializable]
+    public class PromoAbandonTaskResponse : PromoResponseBase
+    {
+        public string BonusTaskId = "";
+        public string CloseReason = "";
+        public decimal FinalCurrentWagerAmount;
+        public decimal ConvertedAmount;
+        public string ClosedAt = "";
+        public bool AlreadyClosed;
+    }
+
+    [Serializable]
+    public class PromoGetHistoryResponse : PromoResponseBase
+    {
+        public string FromInclusive = "";
+        public string ToExclusive = "";
+        public int Offset;
+        public int Limit;
+        public List<PromoHistoryItem> Items = new List<PromoHistoryItem>();
     }
 
     [Serializable]

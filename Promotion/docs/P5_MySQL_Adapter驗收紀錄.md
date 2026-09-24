@@ -18,4 +18,4 @@
 
 - 使用者已確認新增 `ConcurrencyConflict`，資格條件更新 0 列與 PromotionBonusStatus 更新後重新讀取不一致均使用此分類；PCS-03、PCS-05 與 DB-022 測試規格已同步。
 - DB-030 要驗證 PromotionBonusStatus → TriggerEvent → Eligibility → Activity → PromotionBonusHistory 的完整業務鎖序，須在 P6 流程協調元件完成後進行；P5 已固定資格資料按 `EligibilityEntryId` 遞增處理。
-- DEC-001 正式 MySQL／Provider 版本尚未簽核；`net6.0`／`MySql.Data` 9.4.0 的支援警告未解。這阻擋正式環境驗收，不阻擋本機 P5 實作。P6 階段成果見 [P6 驗收紀錄](P6_Core_Facade驗收紀錄.md)；P7 Host 業務入口仍不可啟用。
+- DEC-001 正式 MySQL／Provider 版本尚未簽核；`net6.0`／`MySql.Data` 9.4.0 的支援警告未解。這阻擋正式環境驗收，不阻擋本機 P5 實作。P6 階段成果見 [P6 驗收紀錄](P6_Core_Facade驗收紀錄.md)；P7 Host 整合位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`。

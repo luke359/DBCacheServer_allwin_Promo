@@ -2,7 +2,7 @@
 
 此目錄以 PCS-01～PCS-07 為規格來源，使用 C# 10、.NET 6 與 UTF-8。
 
-目前已建立 P0 的獨立 Solution(方案)骨架、中央套件版本與鎖定檔，以及 P1／P2 的公開契約、領域模型、純計算、快照與輸入驗證。依更新的企劃案，兩個上限已改為 `null` 表示無限制，新增 `GameServerList` 查詢契約與 `WagerCalculationType`，新快照為版本 2 並保留版本 1 讀取能力。P3 已包含 V001 建表、V002 活動欄位升級、V003 獎勵表更名，以及 V004 在 PromotionBonusStatus 保存每日首登入／首儲最近 Business Day；每日維護不清除這兩個日期。P4 已在 DBCache 專案新增 `MysqlAcess` partial V2、型別化參數與交易 Context。P5 核心專用 MySQL Adapter、DBCache V2 橋接、五表 Mapper 與本機可獨立執行的驗收已完成；完整 DB-009～DB-030 清單仍包含 P4 限制與 P6 流程相依案例。`Promotion.Host.DBCache` 仍只有空專案骨架，**P6 Facade 本機階段驗收已完成，P7 Host 業務接線尚未實作，不可部署或啟用**。公開 `IPromotionCoreService` 是契約；P6 Facade 已完成本機階段驗收。
+目前已建立 P0 的獨立 Solution(方案)骨架、中央套件版本與鎖定檔，以及 P1／P2 的公開契約、領域模型、純計算、快照與輸入驗證。依更新的企劃案，兩個上限已改為 `null` 表示無限制，新增 `GameServerList` 查詢契約與 `WagerCalculationType`，新快照為版本 2 並保留版本 1 讀取能力。P3 已包含 V001 建表、V002 活動欄位升級、V003 獎勵表更名，以及 V004 在 PromotionBonusStatus 保存每日首登入／首儲最近 Business Day；每日維護不清除這兩個日期。P4 已在 DBCache 專案新增 `MysqlAcess` partial V2、型別化參數與交易 Context。P5 核心專用 MySQL Adapter、DBCache V2 橋接、五表 Mapper 與本機可獨立執行的驗收已完成；完整 DB-009～DB-030 清單仍包含 P4 限制與 P6 流程相依案例。P6 Facade 本機階段驗收已完成；P7 的 DBCache Host 整合位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`，不再保留獨立的 `Promotion.Host.DBCache` 專案。公開 `IPromotionCoreService` 是契約。
 
 本地測試用 MySQL 連線在這裡 D:\Mobile_Sever_t01\SqlConnection.txt  
 

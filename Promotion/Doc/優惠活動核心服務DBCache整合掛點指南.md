@@ -2,7 +2,7 @@
 
 ## 1. 範圍與現況
 
-本文件供 P7 整合前決定 **Host 在哪個業務時機呼叫核心服務**。公開契約以 `src/Promotion.Core.Contracts/IPromotionCoreService.cs`、`RequestsAndResults.cs`、`CommonDtos.cs` 為準，共 12 個同步 API(Application Programming Interface，應用程式介面)。本文不指定 DBCache 內的函式、事件訂閱點或檔案位置；這些實際接線位置由 DB 維護團隊決定。`Promotion.Host.DBCache` 目前仍是空專案骨架，本文是接線指南，不表示 P7 已完成。
+本文件說明 DBCache Host 在各業務時機呼叫核心服務的掛點。公開契約以 `src/Promotion.Core.Contracts/IPromotionCoreService.cs`、`RequestsAndResults.cs`、`CommonDtos.cs` 為準，共 12 個同步 API(Application Programming Interface，應用程式介面)。Host 的組合根與核心初始化位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`；實際事件訂閱與業務接線由 DBCache 維護團隊實作及維護。本方案不再保留獨立的 `Promotion.Host.DBCache` 專案。
 
 所有方法都回傳 `PromotionResult<T>`：`Kind`（`Succeeded`、`Rejected`、`RetryableFailure`、`PermanentFailure`、`OutcomeUnknown`；每日維護另可能有 `PartialSucceeded`）、`ErrorCode`、`IsRetryable`、`CorrelationId`、`Data`、`ErrorDetails`。成功時讀取 `Data`；失敗時依結果種類與錯誤碼處理。`CorrelationId` 只供追蹤，不能當作事件、遊戲局或錢包操作的冪等鍵。以下各節的「輸出」指成功時的 `Data` 型別與欄位。
 

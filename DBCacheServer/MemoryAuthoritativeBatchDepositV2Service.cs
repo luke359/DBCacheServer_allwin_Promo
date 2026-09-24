@@ -21,6 +21,7 @@ namespace DBCacheServer
         internal bool KeyOutLimit;
         internal bool CreditRebateFg;
         internal bool CanRebateKeyOut;
+        internal double SessionId;
     }
 
     internal sealed class MemoryAuthoritativeBatchDepositV2Service
@@ -39,7 +40,7 @@ namespace DBCacheServer
             this.recallExternalWallet = recallExternalWallet;
         }
 
-        internal BatchDepositV2Result Handle(BatchDepositV2Request request)
+        internal BatchDepositV2Result Handle(BatchDepositV2Request request, int? apiH5DatabaseChannel = null)
         {
             var elapsed = Stopwatch.StartNew();
             string validationError = ValidateRequest(request);
@@ -91,7 +92,7 @@ namespace DBCacheServer
                     });
 
                     stage = "external_wallet_recall";
-                    string transientFailure = PrepareWithdrawAll(request, players);
+                    string transientFailure = PrepareWithdrawAll(request, players, apiH5DatabaseChannel.HasValue);
                     if (transientFailure != null)
                         return LogTransientFailure(request, requestHash, transientFailure, elapsed.Elapsed, stage);
 
@@ -127,10 +128,11 @@ namespace DBCacheServer
                         stage = "repository_execute";
                         bool committed;
                         BatchDepositV2Result result = repository.Execute(request, requestHash, players,
-                            playerBalanceLimit, depositUnit, cache.GetCountryExtraBonusString(), out committed);
+                            playerBalanceLimit, depositUnit, cache.GetCountryExtraBonusString(),
+                            apiH5DatabaseChannel, out committed);
                         stage = "synchronize_memory";
                         if (committed)
-                            cache.SynchronizeCommittedBatchDepositV2(result);
+                            cache.SynchronizeCommittedBatchDepositV2(result, apiH5DatabaseChannel.HasValue);
                         stage = "record_metrics";
                         BatchDepositV2Metrics.Record(result, committed);
                         LogCompletion(request, result, elapsed);
@@ -162,8 +164,9 @@ namespace DBCacheServer
         }
 
         private string PrepareWithdrawAll(BatchDepositV2Request request,
-            IReadOnlyDictionary<int, BatchDepositV2PlayerSnapshot> players)
+            IReadOnlyDictionary<int, BatchDepositV2PlayerSnapshot> players, bool apiH5)
         {
+            if (apiH5) return null;
             if (request.ActorType != BatchDepositV2ActorType.ApiClient) return null;
             foreach (BatchDepositV2RequestDetail detail in request.Details)
             {

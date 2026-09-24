@@ -1,6 +1,5 @@
 ﻿using MySql.Data.MySqlClient;
 using MySqlX.XDevAPI.Common;
-using Promotion.Core.Contracts;
 using Protocol;
 using StackExchange.Redis;
 using System;
@@ -1762,7 +1761,7 @@ namespace DBCacheServer
         /// <summary>優惠活動日切換時間。以後改由 Country 提供的方法取得。</summary>
         TimeSpan GetPromotionBusinessDayCutover()
         {
-            return TimeSpan.FromHours(8);
+            return TimeSpan.FromHours(8); //#260922
         }
 
         public bool CountryOverDayJudge()
@@ -3846,7 +3845,7 @@ namespace DBCacheServer
 
         // The V2 database transaction has already persisted these fields.  Keep the
         // in-memory cache in sync without scheduling a second Usertable write.
-        public void SynchronizeCommittedBatchDepositV2(BatchDepositV2Result result)
+        public void SynchronizeCommittedBatchDepositV2(BatchDepositV2Result result, bool apiH5 = false)
         {
             foreach (var detail in result.Details)
             {
@@ -3854,7 +3853,6 @@ namespace DBCacheServer
                 lock (UserDataList)
                 {
                     if (!UserDataList.TryGetValue(detail.UserUID, out user)) continue;
-
                     user.UserBalance = (double)detail.AfterBalance;
                     user.SessionID = detail.SessionId;
                     if (detail.ExtraBonus > 0)
@@ -3867,7 +3865,20 @@ namespace DBCacheServer
                     bool isKeyin = detail.OperationMode == BatchDepositV2OperationMode.Deposit;
                     CreateRewardSession(user, isKeyin,  detail.RequestAmount, detail.BeforeBalance);
                 }
-                UpdateKeyInOutRec(user, (double)detail.RequestAmount);
+                if (apiH5)
+                {
+                    double amount = Math.Abs((double)detail.RequestAmount);
+                    if (detail.OperationMode == BatchDepositV2OperationMode.Deposit)
+                        PlayerReportH5In(user.UserUID, amount);
+                    else
+                        PlayerReportH5Out(user.UserUID, amount);
+                }
+                else
+                {
+                    double amount = Math.Abs((double)detail.RequestAmount);
+                    UpdateKeyInOutRec(user,
+                        detail.OperationMode == BatchDepositV2OperationMode.Deposit ? amount : -amount);
+                }
 
                 //優惠活動 玩家儲值成功 #260922 
                 if (detail.OperationMode == BatchDepositV2OperationMode.Deposit && detail.RequestAmount > 0)
@@ -3948,7 +3959,8 @@ namespace DBCacheServer
                     {
                         UserUid = user.UserUID,
                         UserId = user.UserID,
-                        Balance = Convert.ToDecimal(user.UserBalance),
+                        Balance = decimal.Round(Convert.ToDecimal(user.UserBalance),
+                            Program.AccuracyDigitBal, MidpointRounding.ToEven),
                         ManagerId = user.AspNetUserId,
                         EntityId = user.EntityId,
                         IsBlocked = user.blockFlag,
@@ -3956,7 +3968,8 @@ namespace DBCacheServer
                         KeyInAward = user.KeyInAward,
                         KeyOutLimit = user.KeyOutLimit,
                         CreditRebateFg = user.CreditRebateFg,
-                        CanRebateKeyOut = CanRebateKeyOut(user)
+                        CanRebateKeyOut = CanRebateKeyOut(user),
+                        SessionId = user.SessionID
                     };
                 }
             }

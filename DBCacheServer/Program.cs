@@ -8059,10 +8059,30 @@ namespace DBCacheServer
                                                                     else
                                                                     {
                                                                         Console.WriteLine("Gat API Step 6");
-
-                                                                        result = new MemoryAuthoritativeBatchDepositV2Service(
-                                                                            DBCache, myAcess, RecallExternalWalletForMerchantApi)
-                                                                            .Handle(request);
+                                                                        int? apiH5DatabaseChannel = null;
+                                                                        int databaseChannel = 0;
+                                                                        if (request?.ActorType == BatchDepositV2ActorType.ApiClient &&
+                                                                            !ApiH5TransChannel.TryParseWebCommand(
+                                                                                RicevieData.webInfo.WebCommand,
+                                                                                out databaseChannel))
+                                                                        {
+                                                                            result = new BatchDepositV2Result
+                                                                            {
+                                                                                BatchId = request?.BatchId,
+                                                                                IdempotencyKey = request?.IdempotencyKey,
+                                                                                Status = BatchDepositV2Status.Failed,
+                                                                                FailureCode = "InvalidTransChannel",
+                                                                                Details = new List<BatchDepositV2ResultDetail>()
+                                                                            };
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            if (request?.ActorType == BatchDepositV2ActorType.ApiClient)
+                                                                                apiH5DatabaseChannel = databaseChannel;
+                                                                            result = new MemoryAuthoritativeBatchDepositV2Service(
+                                                                                DBCache, myAcess, RecallExternalWalletForMerchantApi)
+                                                                                .Handle(request, apiH5DatabaseChannel);
+                                                                        }
                                                                     }
 
                                                                     Console.WriteLine("Gat API Step 7");
@@ -13275,6 +13295,36 @@ namespace DBCacheServer
                                                 //MyConsole.WriteLine($"更新[{RicevieData.GameServer}]共用機率資料");
                                                 DBCache.UpdataGameServerCalcPool(RicevieData.GameServer, RicevieData.Data);
                                             }
+                                            else
+                                            {
+                                                // 優惠活動通訊入口；Data 欄位契約見「優惠錢包Request／Response Command對照.md」。
+                                                // 業務實作接入此處後，仍使用對應的 Promo*Response Command 回覆。
+                                                string responseCommand = GetPromoResponseCommand(RicevieData.Command);
+                                                if (responseCommand != null)
+                                                {
+                                                    var response = new CommonInfoData
+                                                    {
+                                                        Command = responseCommand,
+                                                        UserUID = RicevieData.UserUID,
+                                                        GameServer = RicevieData.GameServer
+                                                    };
+                                                    // PROMO_FAKE_RESPONSES=false 時留給正式業務接入；目前明確回覆未實作。
+                                                    //if (PromoMockResponse.Enabled)
+                                                    //{
+                                                    //    response.Message = "MockResponse";
+                                                    //    response.Data["IsMock"] = "true";
+                                                    //    response.Data["Payload"] = PromoMockResponse.CreatePayload(RicevieData);
+                                                    //}
+                                                    //else
+                                                    //{
+                                                    //    response.Message = "NotImplemented";
+                                                    //    response.Data["ErrorCode"] = "NotImplemented";
+                                                    //}
+                                                    if (RicevieData.Data != null && RicevieData.Data.TryGetValue("RequestId", out string requestId))
+                                                        response.Data["RequestId"] = requestId;
+                                                    m_ListenGameServerSocket.SendMessage(token, Message.SerializrToStream(response));
+                                                }
+                                            }
                                         }
                                     }
                                     break;
@@ -13575,6 +13625,32 @@ namespace DBCacheServer
                     MyConsole.WriteLine(e.Message);
                     MyConsole.WriteLine(e.StackTrace);
                 }
+            }
+        }
+
+        /// <summary>優惠活動請求對應回覆 Command；業務處理稍後接入。</summary>
+        static string GetPromoResponseCommand(string command)
+        {
+            switch (command)
+            {
+                case "PromoGetActivitiesRequest": // 查詢玩家所屬代理商在本活動日的全部活動
+                    return "PromoGetActivitiesResponse";
+                case "PromoGetPlayerOffersRequest": // 查詢玩家本活動日可領及已領的活動優惠
+                    return "PromoGetPlayerOffersResponse";
+                case "PromoGetGamesRequest": // 查詢指定活動的可玩遊戲列表
+                    return "PromoGetGamesResponse";
+                case "PromoClaimRequest": // 用 EligibilityEntryId 領取優惠並建立 Bonus Task
+                    return "PromoClaimResponse";
+                case "PromoClaimUnlockRequest": // 用 BonusTaskId 領取達標後的手動解鎖金
+                    return "PromoClaimUnlockResponse";
+                case "PromoGetTaskRequest": // 查詢目前任務及流水進度
+                    return "PromoGetTaskResponse";
+                case "PromoAbandonTaskRequest": // 用 BonusTaskId 主動放棄進行中任務
+                    return "PromoAbandonTaskResponse";
+                case "PromoGetHistoryRequest": // 分頁查詢 90 日內的優惠結案紀錄
+                    return "PromoGetHistoryResponse";
+                default:
+                    return null;
             }
         }
 

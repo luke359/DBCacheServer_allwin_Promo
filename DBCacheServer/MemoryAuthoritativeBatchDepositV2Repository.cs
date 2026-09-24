@@ -33,7 +33,8 @@ namespace DBCacheServer
 
         internal BatchDepositV2Result Execute(BatchDepositV2Request request, string requestHash,
             IReadOnlyDictionary<int, BatchDepositV2PlayerSnapshot> players, double playerBalanceLimit,
-            double depositUnit, CountrySettingData bonusSetting, out bool committed)
+            double depositUnit, CountrySettingData bonusSetting, int? apiH5DatabaseChannel,
+            out bool committed)
         {
             bool newSuccess = false;
             BatchDepositV2Result result;
@@ -93,20 +94,26 @@ namespace DBCacheServer
                     foreach (BatchDepositV2RequestDetail detail in details)
                     {
                         BatchDepositV2PlayerSnapshot player = players[detail.UserUID];
+                        decimal beforeBalance = decimal.Round(player.Balance, Program.AccuracyDigitBal,
+                            MidpointRounding.ToEven);
                         decimal signedAmount = GetSignedAmount(detail);
                         decimal extraBonus = request.ActorType == BatchDepositV2ActorType.WebUser &&
                             detail.OperationMode == BatchDepositV2OperationMode.Deposit
                             ? CalculateBonus(player, detail.RequestAmount, bonusSetting)
                             : 0m;
-                        decimal afterBalance = player.Balance + signedAmount + extraBonus;
-                        double sessionId = detail.OperationMode == BatchDepositV2OperationMode.Deposit
-                            ? Message.GetSessionID() : 0;
+                        decimal afterBalance = decimal.Round(beforeBalance + signedAmount + extraBonus,
+                            Program.AccuracyDigitBal, MidpointRounding.ToEven);
+                        decimal effectiveDelta = afterBalance - beforeBalance;
+                        bool apiH5 = apiH5DatabaseChannel.HasValue;
+                        double sessionId = !apiH5 && detail.OperationMode == BatchDepositV2OperationMode.Deposit
+                            ? Message.GetSessionID() : player.SessionId;
                         int tradeRecordId = UpdatePlayerAndInsertTradeRecord(connection, transaction, request,
-                            operatorEntityId, player, signedAmount, extraBonus, afterBalance, sessionId);
+                            operatorEntityId, player, signedAmount, extraBonus, beforeBalance, afterBalance,
+                            sessionId, apiH5DatabaseChannel);
                         InsertDetail(connection, transaction, request.BatchId, sequence, player, detail.OperationMode,
-                            detail.RequestAmount, extraBonus, afterBalance, sessionId, tradeRecordId);
+                            detail.RequestAmount, extraBonus, beforeBalance, afterBalance, sessionId, tradeRecordId);
                         InsertOutbox(connection, transaction, request.BatchId, sequence, player,
-                            signedAmount + extraBonus, sessionId);
+                            effectiveDelta, sessionId);
                         BatchDepositV2FaultInjection.ThrowIfEnabled("AfterOutboxInsert");
                         result.Details.Add(new BatchDepositV2ResultDetail
                         {
@@ -115,7 +122,7 @@ namespace DBCacheServer
                             RequestAmount = detail.RequestAmount,
                             OperationMode = detail.OperationMode,
                             ExtraBonus = extraBonus,
-                            BeforeBalance = player.Balance,
+                            BeforeBalance = beforeBalance,
                             AfterBalance = afterBalance,
                             SessionId = sessionId,
                             TradeRecordId = tradeRecordId,
@@ -444,23 +451,42 @@ namespace DBCacheServer
 
         private static int UpdatePlayerAndInsertTradeRecord(MySqlConnection c, MySqlTransaction t,
             BatchDepositV2Request request, int operatorEntityId, BatchDepositV2PlayerSnapshot player, decimal amount,
-            decimal extraBonus, decimal afterBalance, double sessionId)
+            decimal extraBonus, decimal beforeBalance, decimal afterBalance, double sessionId,
+            int? apiH5DatabaseChannel)
         {
             bool isDeposit = amount > 0;
-            bool api = request.ActorType == BatchDepositV2ActorType.ApiClient;
+            bool apiH5 = apiH5DatabaseChannel.HasValue;
             Execute(c, t,
-                "UPDATE Usertable SET UserBalance = @balance, SessionID = IF(@isDeposit = 1, @sessionId, SessionID), " +
+                "UPDATE Usertable SET UserBalance = @balance, SessionID = IF(@updateSession = 1, @sessionId, SessionID), " +
                 "KeyInAward = IF(@applyBonus = 1, 1, KeyInAward), KeyOutLimit = IF(@applyBonus = 1, 1, KeyOutLimit) " +
                 "WHERE UserUID = @userUid",
-                ("@balance", afterBalance), ("@sessionId", sessionId), ("@isDeposit", isDeposit),
+                ("@balance", afterBalance), ("@sessionId", sessionId),
+                ("@updateSession", !apiH5 && isDeposit),
                 ("@applyBonus", extraBonus > 0), ("@userUid", player.UserUid));
+            if (apiH5)
+            {
+                Execute(c, t,
+                    "INSERT INTO MangerToUserTradeRecord (TradeType, OperationType, TransactionType, Status, OperatorId, UserUID, UserID, OperatorEntityId, EntityID, BeforeBalance, Amount, ExtraBonus, IP, StatusValue, SearchIndex, TimeStamp, TransChannel) " +
+                    "VALUES ('PlayerBalanceDeal', @operationType, @transactionType, 'Approved', @operatorId, @userUid, @userId, @operatorEntityId, @entityId, @beforeBalance, @amount, 0, @ip, '2', @searchIndex, @timeStamp, @transChannel)",
+                    ("@operatorId", player.ManagerId), ("@userUid", player.UserUid),
+                    ("@userId", player.UserId), ("@operatorEntityId", player.EntityId),
+                    ("@entityId", player.EntityId), ("@beforeBalance", beforeBalance),
+                    ("@amount", Math.Abs(amount)), ("@ip", request.RequestIp),
+                    ("@operationType", isDeposit ? "Deposit" : "Withdrawal"),
+                    ("@transactionType", isDeposit ? "1" : "2"),
+                    ("@searchIndex", Program.GetLogSearchIndex(DateTime.Now, player.UserUid)),
+                    ("@timeStamp", Program.GetLogTimeStamp(DateTime.Now)),
+                    ("@transChannel", apiH5DatabaseChannel.Value));
+                using (var command = Command(c, t, "SELECT LAST_INSERT_ID()"))
+                    return Convert.ToInt32(command.ExecuteScalar());
+            }
             Execute(c, t,
                 "INSERT INTO MangerToUserTradeRecord (TradeType, OperationType, TransactionType, Status, OperatorId, APIManagerId, UserUID, UserID, OperatorEntityId, EntityID, BeforeBalance, Amount, ExtraBonus, IP, StatusValue, SearchIndex, TimeStamp) " +
                 "VALUES ('PlayerBalanceDeal', @operationType, @transactionType, @status, @operatorId, @apiManagerId, @userUid, @userId, @operatorEntityId, @entityId, @beforeBalance, @amount, @extraBonus, @ip, '2', @searchIndex, @timeStamp)",
-                ("@operatorId", request.PayerManagerId), ("@apiManagerId", api ? request.PayerManagerId : null),
+                ("@operatorId", request.PayerManagerId), ("@apiManagerId", null),
                 ("@userUid", player.UserUid), ("@userId", player.UserId),
                 ("@operatorEntityId", operatorEntityId), ("@entityId", player.EntityId),
-                ("@beforeBalance", player.Balance), ("@amount", amount), ("@extraBonus", extraBonus),
+                ("@beforeBalance", beforeBalance), ("@amount", Math.Abs(amount)), ("@extraBonus", extraBonus),
                 ("@ip", request.RequestIp), ("@operationType", isDeposit ? "Deposit" : "Withdrawal"),
                 ("@transactionType", isDeposit ? "1" : "2"),
                 ("@status", isDeposit ? "Approved" : "Completed"),
@@ -472,13 +498,14 @@ namespace DBCacheServer
 
         private static void InsertDetail(MySqlConnection c, MySqlTransaction t, string batchId, int sequence,
             BatchDepositV2PlayerSnapshot player, BatchDepositV2OperationMode operationMode,
-            decimal requestAmount, decimal extraBonus, decimal afterBalance, double sessionId, int tradeRecordId)
+            decimal requestAmount, decimal extraBonus, decimal beforeBalance, decimal afterBalance,
+            double sessionId, int tradeRecordId)
         {
             Execute(c, t, "INSERT INTO BatchDepositDetailV2 (BatchId, DetailSequence, UserUID, UserId, EntityId, OperationMode, RequestAmount, ExtraBonus, BeforeBalance, AfterBalance, SessionId, TradeRecordId, Status, CreatedAtUtc) VALUES (@batchId, @sequence, @userUid, @userId, @entityId, @operationMode, @amount, @extraBonus, @beforeBalance, @afterBalance, @sessionId, @tradeRecordId, 'Succeeded', UTC_TIMESTAMP(6))",
                 ("@batchId", batchId), ("@sequence", sequence), ("@userUid", player.UserUid),
                 ("@userId", player.UserId), ("@entityId", player.EntityId),
                 ("@operationMode", operationMode.ToString()), ("@amount", requestAmount), ("@extraBonus", extraBonus),
-                ("@beforeBalance", player.Balance), ("@afterBalance", afterBalance),
+                ("@beforeBalance", beforeBalance), ("@afterBalance", afterBalance),
                 ("@sessionId", sessionId), ("@tradeRecordId", tradeRecordId));
         }
 
