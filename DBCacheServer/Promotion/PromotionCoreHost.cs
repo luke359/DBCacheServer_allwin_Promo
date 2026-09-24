@@ -10,7 +10,7 @@ using Promotion.Data.MySql;
 namespace DBCacheServer
 {
     /// <summary>優惠活動核心服務的 DBCache Host 組合根。單一程序內使用 Singleton(單例)。</summary>
-    internal static class PromotionCoreHost
+    internal static partial class PromotionCoreHost
     {
         private static readonly object Sync = new object();
         private static readonly BalanceConvertFormula BalanceFormula = ConvertBalance;

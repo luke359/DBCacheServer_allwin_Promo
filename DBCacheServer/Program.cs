@@ -13309,17 +13309,17 @@ namespace DBCacheServer
                                                         GameServer = RicevieData.GameServer
                                                     };
                                                     // PROMO_FAKE_RESPONSES=false 時留給正式業務接入；目前明確回覆未實作。
-                                                    //if (PromoMockResponse.Enabled)
-                                                    //{
-                                                    //    response.Message = "MockResponse";
-                                                    //    response.Data["IsMock"] = "true";
-                                                    //    response.Data["Payload"] = PromoMockResponse.CreatePayload(RicevieData);
-                                                    //}
-                                                    //else
-                                                    //{
-                                                    //    response.Message = "NotImplemented";
-                                                    //    response.Data["ErrorCode"] = "NotImplemented";
-                                                    //}
+                                                    if (PromoMockResponse.Enabled)
+                                                    {
+                                                        response.Message = "MockResponse";
+                                                        response.Data["IsMock"] = "true";
+                                                        response.Data["Payload"] = PromoMockResponse.CreatePayload(RicevieData);
+                                                    }
+                                                    else
+                                                    {
+                                                        response.Message = "NotImplemented";
+                                                        response.Data["ErrorCode"] = "NotImplemented";
+                                                    }
                                                     if (RicevieData.Data != null && RicevieData.Data.TryGetValue("RequestId", out string requestId))
                                                         response.Data["RequestId"] = requestId;
                                                     m_ListenGameServerSocket.SendMessage(token, Message.SerializrToStream(response));
