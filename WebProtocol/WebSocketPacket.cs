@@ -670,6 +670,8 @@ namespace WebProtocol
 
         public int GameMode;  //獨立買遊戲旗號
 
+        public int WalletMode;  //錢包模式 0=主錢包 1=Bonus錢包
+
         public double IndepPlayInfo;  //獨立買總押分
 
         public string ExtInfo;
