@@ -1619,7 +1619,7 @@ namespace DBCacheServer
         #endregion
 
 
-        #region 返水 //優惠活動 #260922
+        #region 優惠活動 #260922
         /// <summary>代理商優惠啟用開關</summary>
         public bool PromotionFg { get; private set; } = false;
         /// <summary>代理商優惠列表</summary>

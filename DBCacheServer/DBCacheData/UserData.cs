@@ -12,7 +12,7 @@ using ProbabilityLib;
 
 namespace DBCacheServer
 {
-    public class UserData
+    public partial class UserData
     {
         #region 玩家主要資料
         /// <summary>唯一碼</summary>

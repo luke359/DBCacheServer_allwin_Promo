@@ -393,31 +393,6 @@ namespace DBCacheServer
         }
     }
 
-    internal sealed class PromoAvailableOfferPayload
-    {
-        public long EligibilityEntryId;
-        public long ActivityUID;
-        public string EventId = "";
-        public string ActivityInfo = "";
-        public string TriggerType = "";
-        public decimal? EligibleDepositAmount;
-        public decimal EstimatedBonusAmount;
-        public decimal EstimatedRequiredWagerAmount;
-        public int? MaxBetAmount;
-    }
-
-    internal sealed class PromoClaimedOfferPayload
-    {
-        public long EligibilityEntryId;
-        public string BonusTaskId = "";
-        public long ActivityUID;
-        public string ActivityInfo = "";
-        public decimal BonusAmount;
-        public string ClaimedAt = "";
-        public string TaskState = "";
-        public string CloseReason = "";
-    }
-
     internal sealed class PromoGetPlayerOffersPayload
     {
         public string BusinessDay = "";

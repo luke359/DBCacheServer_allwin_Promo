@@ -500,6 +500,7 @@ namespace DBCacheServer
             GetCountrySetting(); //2.先取地區設定
             GetDBEntityData();   //3.再取代理商設定
             GetDBUserData();    //4.最後取玩家設定, 這4個順序不可變更
+            PromotionWalletDispatcher.Bind(this); //優惠錢包指令入帳 #260922
             PromotionCoreHost.BuildAndInitialize(GetPromotionBusinessDayCutover()); //優惠活動 開機init #260922 
             InitEntityOk = true;
 
@@ -3767,6 +3768,7 @@ namespace DBCacheServer
             SecondBonus,
             ThirdBonus,
             SpecialBonus,
+            Promotion, //優惠活動錢包指令 #260922
         }
         /// <summary>
         /// 更新玩家的錢,能量條,星星總數
@@ -4144,9 +4146,8 @@ namespace DBCacheServer
                     //回傳最新的IP資訊
                     ipInfoReturn.Add(user.GetIpInfoGameResult(server));
 
-                    //優惠活動 累計流水 #260922
-                    //UNDONE: 這裡需要將優惠活動的流水資訊傳回 GameServer->Client 
-                    PromotionAccumulateWager(user, totBet, totWin);
+                    //優惠活動流水改由玩家遊戲紀錄的 SerialNumber 去重後送入。#260922
+                    //UNDONE: 這裡需要將優惠活動的流水資訊傳回 GameServer->Client
 
                     //玩家抽放水記錄
                     if (waterInTake != 0)
@@ -10473,6 +10474,9 @@ namespace DBCacheServer
             int jpType = Convert.ToInt32(insertData["JpAccountUID"]);  //先將JpType儲存起來
             double totBet = Convert.ToDouble(insertData["TotalBet"]);
             double totWin = Convert.ToDouble(insertData["TotalWin"]);
+            long promotionSerial = 0;
+            if (insertData.ContainsKey("SerialNumber"))
+                long.TryParse(insertData["SerialNumber"], out promotionSerial);
             int machUid = Convert.ToInt32(insertData["GameMachine"]);
             string gameName = insertData["GameName"];
             string gameType = insertData["GameType"];
@@ -10562,6 +10566,16 @@ namespace DBCacheServer
             {
                 if (userData.IsBot == false)
                 {
+                    //優惠活動 累計流水。一筆 userGameData、一個 SerialNumber 算一局。#260922
+                    try
+                    {
+                        PromotionAccumulateWager(userData, totBet, totWin, promotionSerial);
+                    }
+                    catch (Exception ex)
+                    {
+                        MyConsole.WriteLine("Promotion 累計流水例外：UserUID=" + userUid + " " + ex.Message);
+                    }
+
                     //Console.WriteLine("更新任務進度(遊玩局數)" + userUid + "-" + gameServerCode);
                     Dictionary<string, string> mInfo = new Dictionary<string, string>();
                     mInfo.Add("GameServerCode", ((int)gameServerCode).ToString());

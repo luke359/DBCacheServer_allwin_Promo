@@ -13298,7 +13298,6 @@ namespace DBCacheServer
                                             else
                                             {
                                                 // 優惠活動通訊入口；Data 欄位契約見「優惠錢包Request／Response Command對照.md」。
-                                                // 業務實作接入此處後，仍使用對應的 Promo*Response Command 回覆。
                                                 string responseCommand = GetPromoResponseCommand(RicevieData.Command);
                                                 if (responseCommand != null)
                                                 {
@@ -13308,7 +13307,6 @@ namespace DBCacheServer
                                                         UserUID = RicevieData.UserUID,
                                                         GameServer = RicevieData.GameServer
                                                     };
-                                                    // PROMO_FAKE_RESPONSES=false 時留給正式業務接入；目前明確回覆未實作。
                                                     if (PromoMockResponse.Enabled)
                                                     {
                                                         response.Message = "MockResponse";
@@ -13317,8 +13315,7 @@ namespace DBCacheServer
                                                     }
                                                     else
                                                     {
-                                                        response.Message = "NotImplemented";
-                                                        response.Data["ErrorCode"] = "NotImplemented";
+                                                        FillPromoClientResponse(response, RicevieData);
                                                     }
                                                     if (RicevieData.Data != null && RicevieData.Data.TryGetValue("RequestId", out string requestId))
                                                         response.Data["RequestId"] = requestId;
@@ -13628,7 +13625,45 @@ namespace DBCacheServer
             }
         }
 
-        /// <summary>優惠活動請求對應回覆 Command；業務處理稍後接入。</summary>
+        /// <summary>
+        /// 正式優惠回覆。UserUID 只用 CommonInfoData，不採信 Data 內的玩家 ID。
+        /// 領取與放棄帶出的錢包指令由 PromotionWalletDispatcher 先保存再入帳。#260922
+        /// </summary>
+        static void FillPromoClientResponse(CommonInfoData response, CommonInfoData request)
+        {
+            PromoClientCommandResult result = PromotionCoreHost.HandleClientCommand(new PromoClientCommand
+            {
+                Command = request.Command,
+                UserUID = request.UserUID,
+                Data = request.Data
+            });
+
+            if (!string.IsNullOrEmpty(result.ResponseCommand))
+                response.Command = result.ResponseCommand;
+
+            response.Message = result.Message ?? "";
+
+            if (!string.IsNullOrEmpty(result.ErrorCode))
+            {
+                response.Data["ErrorCode"] = result.ErrorCode;
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(result.Payload))
+                response.Data["Payload"] = result.Payload;
+
+            if (result.WalletInstructions == null || result.WalletInstructions.Count == 0)
+                return;
+
+            // 核心已成功後才入帳。失敗時保留 Payload，並以 ErrorCode 表示錢包尚未完成。#260922
+            PromotionWalletExecutionResult wallet = PromotionWalletDispatcher.Execute(result.WalletInstructions);
+            if (wallet.AllSucceeded)
+                return;
+            response.Data["ErrorCode"] = wallet.ErrorCode;
+            response.Message = wallet.Message;
+        }
+
+        /// <summary>優惠活動請求對應回覆 Command。未知 Command 回傳 null，不進入優惠處理。</summary>
         static string GetPromoResponseCommand(string command)
         {
             switch (command)
