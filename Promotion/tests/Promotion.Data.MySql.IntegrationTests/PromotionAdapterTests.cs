@@ -552,6 +552,9 @@ public sealed class PromotionAdapterTests
             Assert.Null(activity.MaxBetAmount);
             Assert.Null(activity.MaxBalanceConvertedAmount);
             Assert.Equal(100m, activity.WagerContributionRate);
+            Assert.Equal(new[] { activityUid, activityUid + 1, activityUid + 2 },
+                store.GetActivitiesByIds(new[] { activityUid + 2, activityUid, activityUid + 1, activityUid })
+                    .Select(value => value.ActivityUID));
             var extraColumn = "P5Test_" + suffix[..8];
             using (var addColumn = new MySqlCommand($"ALTER TABLE PromotionActivity ADD COLUMN `{extraColumn}` INT NULL", setup))
                 addColumn.ExecuteNonQuery();
@@ -616,6 +619,7 @@ public sealed class PromotionAdapterTests
             Assert.True(history.BonusHistoryId > 0);
             Assert.Equal(snapshot, store.GetBonusStatus(userUid)!.ActivitySnapshotJson);
             Assert.Equal(history, Assert.Single(store.GetBonusHistory(userUid, now.AddDays(-1), now.AddDays(1), 0, 10)));
+            Assert.Equal(history, Assert.Single(store.GetBonusHistoryByBusinessDay(userUid, day)));
             using (var older = new MySqlCommand("SELECT COUNT(*) FROM PromotionBonusHistory WHERE ClosedAt < @time", setup))
             {
                 older.Parameters.AddWithValue("@time", now);
@@ -636,6 +640,8 @@ public sealed class PromotionAdapterTests
                     taskId, true, null, now));
                 return 0;
             });
+            Assert.Equal(new[] { activityUid + 1 }, store.GetAvailableEligibilityEntries(userUid, day,
+                new[] { activityUid + 1, activityUid + 2 }).Select(value => value.ActivityUID));
             var groupEvent = "group-" + suffix;
             store.ExecuteInTransaction(tx =>
             {

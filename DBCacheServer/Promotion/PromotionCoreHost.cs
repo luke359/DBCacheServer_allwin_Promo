@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using Promotion.Core;
 using Promotion.Core.Contracts;
@@ -390,7 +391,7 @@ namespace DBCacheServer
                 if (token.Length == 0)
                     continue;
 
-                if (!long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id))
+                if (!long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) || id <= 0)
                 {
                     MyConsole.WriteLine(
                         "Promotion 活動名單解析失敗，視為無優惠可用：token=" + token
@@ -401,7 +402,13 @@ namespace DBCacheServer
                 ids.Add(id);
             }
 
-            return ids;
+            long[] distinct = ids.Distinct().ToArray();
+            if (distinct.Length > 1000)
+            {
+                MyConsole.WriteLine("Promotion 活動名單超過 1000 筆，視為無優惠可用");
+                return Array.Empty<long>();
+            }
+            return distinct;
         }
 
         /// <summary>暫定公式：回傳結算後紅利錢包餘額。正式規則確定後再整段替換。</summary>

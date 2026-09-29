@@ -271,10 +271,14 @@ public sealed class PromotionCoreServiceRetryTests
             return result;
         }
         public IReadOnlyList<PromotionActivity> GetActivitiesByTriggerType(TriggerType type, IReadOnlyCollection<long> allowed) => Array.Empty<PromotionActivity>();
+        public IReadOnlyList<PromotionActivity> GetActivitiesByIds(IReadOnlyCollection<long> uids) => Array.Empty<PromotionActivity>();
         public PromotionActivity? GetActivity(long uid) => null;
         public IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long uid, DateOnly day) => Array.Empty<EligibilityEntry>();
+        public IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long uid, DateOnly day,
+            IReadOnlyCollection<long> activityUids) => Array.Empty<EligibilityEntry>();
         public BonusStatus? GetBonusStatus(long uid) => TaskStatus?.UserUID == uid ? TaskStatus : null;
         public IReadOnlyList<BonusHistory> GetBonusHistory(long uid, DateTime from, DateTime to, int offset, int limit) => Array.Empty<BonusHistory>();
+        public IReadOnlyList<BonusHistory> GetBonusHistoryByBusinessDay(long uid, DateOnly day) => Array.Empty<BonusHistory>();
         public IReadOnlyList<long> GetUsersWithExpiredEligibility(DateOnly day, long cursor, int batch) =>
             ExpiredUsers.Where(x => x > cursor).Take(batch).ToArray();
         public IReadOnlyList<long> GetUsersWithExpiredTasks(DateOnly day, long cursor, int batch) =>

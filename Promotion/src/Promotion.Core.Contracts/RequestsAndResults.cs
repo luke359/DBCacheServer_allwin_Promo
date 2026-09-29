@@ -23,6 +23,19 @@ public sealed record AvailablePromotionDto(long EligibilityEntryId, string Event
     decimal EstimatedBonusAmount, decimal EstimatedRequiredWagerAmount, int? MaxBetAmount,
     bool IsNonStackable, string? ExclusiveGroup);
 
+public sealed record GetPlayerPromotionPageRequest(long UserUID, DateTime QueryTime,
+    IReadOnlyCollection<long> VisibleActivityUIDs, bool IncludeTodayCompleted = false,
+    string? CorrelationId = null);
+public sealed record GetPlayerPromotionPageData(long UserUID, DateOnly BusinessDay,
+    bool HasAnyActiveBonusTask, ActiveBonusTaskDto? ActiveTask,
+    IReadOnlyList<PlayerPromotionActivityDto> Activities,
+    IReadOnlyList<BonusHistoryDto>? TodayCompletedItems);
+public sealed record PlayerPromotionActivityDto(long ActivityUID, ActivitySnapshotDto Activity,
+    long? EligibilityEntryId, bool CanClaim, bool HasActiveTask, bool ClaimButtonEnabled,
+    BonusTaskProgressDto? ActiveTaskProgress);
+public sealed record BonusTaskProgressDto(decimal CurrentWagerAmount, decimal RequiredWagerAmount,
+    decimal RemainingWagerAmount);
+
 public sealed record GetGameServerListRequest(long ActivityUID, string? CorrelationId = null);
 public sealed record GameServerListData(long ActivityUID, string? GameServerList);
 

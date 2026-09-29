@@ -2,7 +2,7 @@
 
 ## 1. 範圍與現況
 
-本文件說明 DBCache Host 在各業務時機呼叫核心服務的掛點。公開契約以 `src/Promotion.Core.Contracts/IPromotionCoreService.cs`、`RequestsAndResults.cs`、`CommonDtos.cs` 為準，共 12 個同步 API(Application Programming Interface，應用程式介面)。Host 的組合根與核心初始化位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`；實際事件訂閱與業務接線由 DBCache 維護團隊實作及維護。本方案不再保留獨立的 `Promotion.Host.DBCache` 專案。
+本文件說明 DBCache Host 在各業務時機呼叫核心服務的掛點。公開契約以 `src/Promotion.Core.Contracts/IPromotionCoreService.cs`、`RequestsAndResults.cs`、`CommonDtos.cs` 為準，共 13 個同步 API(Application Programming Interface，應用程式介面)。Host 的組合根與核心初始化位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`；實際事件訂閱與業務接線由 DBCache 維護團隊實作及維護。本方案不再保留獨立的 `Promotion.Host.DBCache` 專案。
 
 所有方法都回傳 `PromotionResult<T>`：`Kind`（`Succeeded`、`Rejected`、`RetryableFailure`、`PermanentFailure`、`OutcomeUnknown`；每日維護另可能有 `PartialSucceeded`）、`ErrorCode`、`IsRetryable`、`CorrelationId`、`Data`、`ErrorDetails`。成功時讀取 `Data`；失敗時依結果種類與錯誤碼處理。`CorrelationId` 只供追蹤，不能當作事件、遊戲局或錢包操作的冪等鍵。以下各節的「輸出」指成功時的 `Data` 型別與欄位。
 
@@ -15,6 +15,7 @@
 | Host 啟動、核心服務實例建立後且承接優惠流量前 | `Initialize` | 設定營業日切換時間與達標時的餘額轉換公式 |
 | 註冊、每次登入候選、每筆成功儲值，或 Host 判定免費活動事件成立時 | `CreateEligibility` | 為事件建立玩家可領資格；核心保證每日首登入／首儲同日只產生一次資格 |
 | Host 要顯示玩家當前全部可領優惠時 | `GetAvailablePromotions` | 取得當前營業日可領清單與是否有進行中任務 |
+| 玩家進入優惠頁時 | `GetPlayerPromotionPage` | 取得代理商授權範圍內的啟用活動、玩家資格、唯一進行中任務與選用的當日完成紀錄 |
 | Host 要查特定活動可玩遊戲伺服器設定時 | `GetGameServerList` | 取得該活動目前的 `GameServerList` 字串 |
 | 玩家選定一筆資格並確認領取時 | `ClaimPromotion` | 建立任務並取得紅利錢包入帳指令 |
 | Host 要顯示或核對玩家目前紅利任務時 | `GetBonusTaskStatus` | 取得進行中任務、剩餘流水與活動快照 |
@@ -50,6 +51,16 @@
 **輸入：** `UserUID: long`；`QueryTime: DateTime` 為查詢當下本地時間、決定要看的營業日；`CorrelationId?`。
 
 **輸出：** `UserUID`、`BusinessDay`、`HasActiveBonusTask`、`ActiveBonusTaskId?`，以及 `Items: IReadOnlyList<AvailablePromotionDto>`。每項有 `EligibilityEntryId`、`EventId`、`ActivityUID`、`BusinessDay`、`TriggerType`、`EligibleDepositAmount?`、`ActivityInfo?`、`EstimatedBonusAmount`、`EstimatedRequiredWagerAmount`、`MaxBetAmount?`、`IsNonStackable`、`ExclusiveGroup?`。只列當前營業日、狀態為 `Available` 的資格；有進行中任務仍會列出資格，但此時不可直接領取。預估金額取查詢當下活動設定，領取時仍會重新計算。空清單為成功。
+
+### 3.3.1 `GetPlayerPromotionPage(GetPlayerPromotionPageRequest) → PromotionResult<GetPlayerPromotionPageData>`
+
+**掛點：** 玩家進入優惠頁時，使用 `PromoGetActivitiesRequest` 或 `PromoGetPlayerOffersRequest`。Host 必須先依 `UserUID` 取得玩家目前所屬 `EntityData`，再從 `EntityData.GetActivityUIDList()` 取得代理商授權範圍；不得接受 CLIENT 傳入的活動 ID。目前範圍取得與 DTO 映射位於 `DBCacheServer/Promotion/Program.Promotion.cs` 及 `PromotionClientCommands.cs`。CommonCommand 的實際分流入口須呼叫 `PromotionCoreHost.HandleClientCommand`。
+
+**輸入：** `UserUID: long`；`QueryTime: DateTime`；`VisibleActivityUIDs: IReadOnlyCollection<long>` 為 Host 取得的範圍，空集合表示不顯示任何活動；`IncludeTodayCompleted: bool`；`CorrelationId?`。Host 會先去重；不重複 ID 上限為 1000，無效 ID 或超限視為無優惠範圍。
+
+**輸出：** `UserUID`、`BusinessDay`、`HasAnyActiveBonusTask`、`ActiveTask?`、`Activities` 與 `TodayCompletedItems?`。`Activities` 只含 `ActivityStatus=Active` 且在授權範圍內的活動，依 `ActivityUID` 遞增，每活動恰一筆；包含畫面活動規則 `Activity`、最新可用 `EligibilityEntryId?`、`CanClaim`、`HasActiveTask`、`ClaimButtonEnabled` 與進行中任務的 `ActiveTaskProgress?`。
+
+`CanClaim` 只表示資格已成立；已有其他進行中任務時，資格仍維持 `CanClaim=true`，但 `ClaimButtonEnabled=false`。前端只可依 `ClaimButtonEnabled` 決定領取按鈕是否可用。`PromoGetActivitiesRequest` 使用 `IncludeTodayCompleted=false`，不讀歷史；`PromoGetPlayerOffersRequest` 使用 `true`，回傳相同 `UserUID` 與 `BusinessDay` 的完成紀錄。完成紀錄為獨立區塊，不影響主清單資格或按鈕。領取仍使用核心回覆的 `EligibilityEntryId` 呼叫 `ClaimPromotion`，並以該交易檢查為最終結果。
 
 ### 3.4 `GetGameServerList(GetGameServerListRequest) → PromotionResult<GameServerListData>`
 

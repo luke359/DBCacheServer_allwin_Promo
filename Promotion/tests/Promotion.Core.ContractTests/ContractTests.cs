@@ -21,11 +21,12 @@ public sealed class ContractTests
     }
 
     [Fact]
-    public void API_ContractHasExactlyTwelveSynchronousMethods()
+    public void API_ContractHasExactlyThirteenSynchronousMethods()
     {
         var methods = typeof(IPromotionCoreService).GetMethods();
-        Assert.Equal(12, methods.Length);
+        Assert.Equal(13, methods.Length);
         Assert.Contains(methods, method => method.Name == nameof(IPromotionCoreService.GetGameServerList));
+        Assert.Contains(methods, method => method.Name == nameof(IPromotionCoreService.GetPlayerPromotionPage));
         Assert.Contains(methods, method => method.Name == nameof(IPromotionCoreService.CloseWagerCompletedBonusTask));
         Assert.All(methods, method => Assert.False(typeof(Task).IsAssignableFrom(method.ReturnType)));
     }

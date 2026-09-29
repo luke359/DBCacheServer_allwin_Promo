@@ -35,12 +35,32 @@ public sealed class PromotionMySqlDataStore : IPromotionDataStore
             new[] { Eq("TriggerType", (byte)triggerType), new Condition("ActivityUID", Comparison.In, scope) },
             new[] { new Sort("ActivityUID") })).Select(PromotionRowMapper.Activity).ToArray();
     }
+    public IReadOnlyList<PromotionActivity> GetActivitiesByIds(IReadOnlyCollection<long> activityUids)
+    {
+        if (activityUids.Count == 0) return Array.Empty<PromotionActivity>();
+        var scope = activityUids.Distinct().ToArray();
+        CheckBatch(scope.Length);
+        return Select(Query(PromotionTableMetadata.Activity, PromotionTableMetadata.ActivityFields,
+            new[] { new Condition("ActivityUID", Comparison.In, scope) },
+            new[] { new Sort("ActivityUID") })).Select(PromotionRowMapper.Activity).ToArray();
+    }
     public PromotionActivity? GetActivity(long activityUid) => One(Select(Query(PromotionTableMetadata.Activity,
         PromotionTableMetadata.ActivityFields, new[] { Eq("ActivityUID", activityUid) })), PromotionRowMapper.Activity);
     public IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long userUid, DateOnly businessDay) =>
         Select(Query(PromotionTableMetadata.Eligibility, PromotionTableMetadata.EligibilityFields,
             new[] { Eq("UserUID", userUid), Eq("BusinessDay", businessDay), Eq("Status", (byte)EligibilityStatus.Available) },
             new[] { new Sort("ActivityUID"), new Sort("EligibilityEntryId") })).Select(PromotionRowMapper.Eligibility).ToArray();
+    public IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long userUid, DateOnly businessDay,
+        IReadOnlyCollection<long> activityUids)
+    {
+        if (activityUids.Count == 0) return Array.Empty<EligibilityEntry>();
+        var scope = activityUids.Distinct().ToArray();
+        CheckBatch(scope.Length);
+        return Select(Query(PromotionTableMetadata.Eligibility, PromotionTableMetadata.EligibilityFields,
+            new[] { Eq("UserUID", userUid), Eq("BusinessDay", businessDay),
+                Eq("Status", (byte)EligibilityStatus.Available), new Condition("ActivityUID", Comparison.In, scope) },
+            new[] { new Sort("ActivityUID"), new Sort("EligibilityEntryId") })).Select(PromotionRowMapper.Eligibility).ToArray();
+    }
     public BonusStatus? GetBonusStatus(long userUid) => One(Select(Query(PromotionTableMetadata.Status,
         PromotionTableMetadata.StatusFields, new[] { Eq("UserUID", userUid) })), PromotionRowMapper.Status);
     public IReadOnlyList<BonusHistory> GetBonusHistory(long userUid, DateTime fromInclusive, DateTime toExclusive, int offset, int limit)
@@ -52,6 +72,11 @@ public sealed class PromotionMySqlDataStore : IPromotionDataStore
             new[] { new Sort("ClosedAt", true), new Sort("BonusHistoryId", true) }, limit, offset))
             .Select(PromotionRowMapper.History).ToArray();
     }
+    public IReadOnlyList<BonusHistory> GetBonusHistoryByBusinessDay(long userUid, DateOnly businessDay) =>
+        Select(Query(PromotionTableMetadata.History, PromotionTableMetadata.HistoryFields,
+            new[] { Eq("UserUID", userUid), Eq("BusinessDay", businessDay) },
+            new[] { new Sort("ClosedAt", true), new Sort("BonusHistoryId", true) }))
+            .Select(PromotionRowMapper.History).ToArray();
     public IReadOnlyList<long> GetUsersWithExpiredEligibility(DateOnly currentBusinessDay, long afterUserUid, int batchSize)
     {
         CheckBatch(batchSize);

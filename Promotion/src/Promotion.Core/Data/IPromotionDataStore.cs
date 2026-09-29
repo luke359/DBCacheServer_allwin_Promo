@@ -7,10 +7,14 @@ public interface IPromotionDataStore
 {
     T ExecuteInTransaction<T>(Func<IPromotionDataTransaction, T> action);
     IReadOnlyList<PromotionActivity> GetActivitiesByTriggerType(TriggerType triggerType, IReadOnlyCollection<long> allowedActivityUids);
+    IReadOnlyList<PromotionActivity> GetActivitiesByIds(IReadOnlyCollection<long> activityUids);
     PromotionActivity? GetActivity(long activityUid);
     IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long userUid, DateOnly businessDay);
+    IReadOnlyList<EligibilityEntry> GetAvailableEligibilityEntries(long userUid, DateOnly businessDay,
+        IReadOnlyCollection<long> activityUids);
     BonusStatus? GetBonusStatus(long userUid);
     IReadOnlyList<BonusHistory> GetBonusHistory(long userUid, DateTime fromInclusive, DateTime toExclusive, int offset, int limit);
+    IReadOnlyList<BonusHistory> GetBonusHistoryByBusinessDay(long userUid, DateOnly businessDay);
     IReadOnlyList<long> GetUsersWithExpiredEligibility(DateOnly currentBusinessDay, long afterUserUid, int batchSize);
     IReadOnlyList<long> GetUsersWithExpiredTasks(DateOnly currentBusinessDay, long afterUserUid, int batchSize);
     int DeleteExpiredBonusHistory(DateTime cutoffExclusive, int batchSize);

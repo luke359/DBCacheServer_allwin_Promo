@@ -13,11 +13,6 @@ namespace DBCacheServer
         public int UserUID;
         public IReadOnlyDictionary<string, string> Data;
 
-        /// <summary>
-        /// 代理商允許的 ActivityUID 名單，逗號分隔。
-        /// PromoGetActivitiesRequest 待核心提供活動目錄查詢後使用；目前不讀核心表。
-        /// </summary>
-        public string ActivityUidList;
     }
 
     /// <summary>Host 回給 DBCache 掛點的結果。掛點負責填 CommonInfoData，並自行保存、執行 WalletInstructions。</summary>
@@ -32,11 +27,9 @@ namespace DBCacheServer
 
     internal static partial class PromotionCoreHost
     {
-        private const int ClaimedHistoryPageSize = 200;
-
         /// <summary>
         /// 處理八個優惠 CLIENT Command。不修改錢包。
-        /// PromoGetActivitiesRequest、PromoClaimUnlockRequest 尚未有對應核心方法，回 NotImplemented。
+        /// 活動範圍一律由 Host 依玩家目前所屬代理商取得，不採信 CLIENT 輸入。
         /// </summary>
         public static PromoClientCommandResult HandleClientCommand(PromoClientCommand command)
         {
@@ -52,9 +45,9 @@ namespace DBCacheServer
                 switch (command.Command)
                 {
                     case "PromoGetActivitiesRequest":
-                        return ActivitiesNotImplemented(responseCommand);
+                        return GetPlayerPromotionPage(command, responseCommand, false);
                     case "PromoGetPlayerOffersRequest":
-                        return GetPlayerOffers(command, responseCommand);
+                        return GetPlayerPromotionPage(command, responseCommand, true);
                     case "PromoGetGamesRequest":
                         return GetGames(command, responseCommand);
                     case "PromoClaimRequest":
@@ -79,18 +72,6 @@ namespace DBCacheServer
         }
 
         /// <summary>
-        /// 需要核心新增唯讀查詢，例如 GetActivities(AllowedActivityUIDs, QueryTime)。
-        /// 回傳本活動日、且落在 ActivityUidList 內的有效活動，不過濾玩家是否已觸發、可領或已領。
-        /// 每筆至少要有 ActivityUID、ActivityInfo、TriggerType、BonusType、FixedBonusAmount、
-        /// DepositPercentage、MaxBonusAmount、MinimumDepositAmount、WagerMultiplier、DailyClaimLimit。
-        /// Host 不直接讀 PromotionActivity。
-        /// </summary>
-        private static PromoClientCommandResult ActivitiesNotImplemented(string responseCommand)
-        {
-            return Fail(responseCommand, "NotImplemented", "活動目錄查詢尚未由核心提供");
-        }
-
-        /// <summary>
         /// 手動解鎖尚未由核心實作。固定金額仍由達標後的 CloseWagerCompletedBonusTask 自動結案。
         /// 不要把 ConvertType.Balance 當成手動解鎖。
         /// 完成後 PromoGetTaskRequest 才能填 UnlockMode、CanClaimUnlock、EstimatedUnlockAmount。
@@ -100,116 +81,55 @@ namespace DBCacheServer
             return Fail(responseCommand, "NotImplemented", "手動解鎖尚未由核心提供");
         }
 
-        private static PromoClientCommandResult GetPlayerOffers(PromoClientCommand command, string responseCommand)
+        private static PromoClientCommandResult GetPlayerPromotionPage(PromoClientCommand command,
+            string responseCommand, bool includeTodayCompleted)
         {
             if (!TryReady(responseCommand, out PromoClientCommandResult notReady))
                 return notReady;
 
-            DateTime queryTime = DateTime.Now;
-            PromotionResult<AvailablePromotionListData> available = service.GetAvailablePromotions(
-                new GetAvailablePromotionsRequest(command.UserUID, queryTime));
-            if (!Succeeded(available, responseCommand, out PromoClientCommandResult availableError))
-                return availableError;
-
-            PromotionResult<BonusTaskStatusData> status = service.GetBonusTaskStatus(
-                new GetBonusTaskStatusRequest(command.UserUID));
-            if (!Succeeded(status, responseCommand, out PromoClientCommandResult statusError))
-                return statusError;
-
-            AvailablePromotionListData data = available.Data;
-            List<PromoClaimedOfferPayload> claimed = new List<PromoClaimedOfferPayload>();
-            string activeTaskId = "";
-            if (status.Data != null && status.Data.HasActiveTask && status.Data.Task != null &&
-                status.Data.Task.BusinessDay == data.BusinessDay)
-            {
-                ActiveBonusTaskDto task = status.Data.Task;
-                activeTaskId = task.BonusTaskId ?? "";
-                claimed.Add(new PromoClaimedOfferPayload
-                {
-                    EligibilityEntryId = task.EligibilityEntryId,
-                    BonusTaskId = activeTaskId,
-                    ActivityUID = task.ActivityUID,
-                    ActivityInfo = task.ActivitySnapshot != null ? task.ActivitySnapshot.ActivityInfo ?? "" : "",
-                    BonusAmount = task.BonusAmount,
-                    ClaimedAt = FormatTime(task.ClaimedAt),
-                    TaskState = "Active",
-                    CloseReason = ""
-                });
-            }
-
-            PromoClientCommandResult historyError = AppendClosedOffers(command.UserUID, data.BusinessDay, claimed, responseCommand);
-            if (historyError != null)
-                return historyError;
+            IReadOnlyList<long> visibleActivityUids = GetVisibleActivityUids(command.UserUID);
+            PromotionResult<GetPlayerPromotionPageData> result = service.GetPlayerPromotionPage(
+                new GetPlayerPromotionPageRequest(command.UserUID, DateTime.Now, visibleActivityUids,
+                    includeTodayCompleted));
+            if (!Succeeded(result, responseCommand, out PromoClientCommandResult error))
+                return error;
 
             return Ok(responseCommand, new PromoGetPlayerOffersPayload
             {
-                BusinessDay = data.BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                AvailableItems = MapAvailable(data.Items),
-                ClaimedItems = claimed,
-                HasActiveBonusTask = data.HasActiveBonusTask,
-                ActiveBonusTaskId = data.ActiveBonusTaskId ?? ""
+                BusinessDay = result.Data.BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                HasActiveBonusTask = result.Data.HasAnyActiveBonusTask,
+                ActiveBonusTaskId = result.Data.ActiveTask?.BonusTaskId ?? "",
+                ActiveTask = result.Data.ActiveTask,
+                Activities = MapActivities(result.Data.Activities),
+                TodayCompletedItems = result.Data.TodayCompletedItems is null
+                    ? new List<BonusHistoryDto>()
+                    : new List<BonusHistoryDto>(result.Data.TodayCompletedItems)
             });
         }
 
-        /// <summary>補上本活動日已結案、且不是目前進行中任務的紀錄。</summary>
-        private static PromoClientCommandResult AppendClosedOffers(
-            int userUid, DateOnly businessDay, List<PromoClaimedOfferPayload> claimed, string responseCommand)
+        private static IReadOnlyList<long> GetVisibleActivityUids(int userUid)
         {
-            DateTime from = businessDay.ToDateTime(TimeOnly.FromTimeSpan(businessDayCutover));
-            DateTime to = DateTime.Now;
-            if (from >= to)
-                return null;
-
-            PromotionResult<BonusHistoryPageData> history = service.GetBonusHistory(new GetBonusHistoryRequest(
-                userUid, from, to, 0, ClaimedHistoryPageSize));
-            if (!Succeeded(history, responseCommand, out PromoClientCommandResult error))
-                return error;
-
-            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; i < claimed.Count; i++)
-                seen.Add(claimed[i].BonusTaskId ?? "");
-
-            IReadOnlyList<BonusHistoryDto> items = history.Data.Items;
-            for (int i = 0; i < items.Count; i++)
-            {
-                BonusHistoryDto item = items[i];
-                if (item.BusinessDay != businessDay || seen.Contains(item.BonusTaskId ?? ""))
-                    continue;
-                claimed.Add(new PromoClaimedOfferPayload
-                {
-                    EligibilityEntryId = item.EligibilityEntryId,
-                    BonusTaskId = item.BonusTaskId ?? "",
-                    ActivityUID = item.ActivityUID,
-                    ActivityInfo = item.ActivitySnapshot != null ? item.ActivitySnapshot.ActivityInfo ?? "" : "",
-                    BonusAmount = item.BonusAmount,
-                    ClaimedAt = FormatTime(item.ClaimedAt),
-                    TaskState = "Closed",
-                    CloseReason = item.CloseReason.ToString()
-                });
-            }
-
-            return null;
+            return GetAllowedActivityUids(Program.GetPromotionActivityUidListForUser(userUid));
         }
 
-        private static List<PromoAvailableOfferPayload> MapAvailable(IReadOnlyList<AvailablePromotionDto> items)
+        private static List<PromoPlayerPromotionActivityPayload> MapActivities(
+            IReadOnlyList<PlayerPromotionActivityDto> activities)
         {
-            List<PromoAvailableOfferPayload> list = new List<PromoAvailableOfferPayload>();
-            if (items == null)
+            List<PromoPlayerPromotionActivityPayload> list = new List<PromoPlayerPromotionActivityPayload>();
+            if (activities == null)
                 return list;
-            for (int i = 0; i < items.Count; i++)
+            for (int i = 0; i < activities.Count; i++)
             {
-                AvailablePromotionDto item = items[i];
-                list.Add(new PromoAvailableOfferPayload
+                PlayerPromotionActivityDto item = activities[i];
+                list.Add(new PromoPlayerPromotionActivityPayload
                 {
-                    EligibilityEntryId = item.EligibilityEntryId,
                     ActivityUID = item.ActivityUID,
-                    EventId = item.EventId ?? "",
-                    ActivityInfo = item.ActivityInfo ?? "",
-                    TriggerType = item.TriggerType.ToString(),
-                    EligibleDepositAmount = item.EligibleDepositAmount,
-                    EstimatedBonusAmount = item.EstimatedBonusAmount,
-                    EstimatedRequiredWagerAmount = item.EstimatedRequiredWagerAmount,
-                    MaxBetAmount = item.MaxBetAmount
+                    Activity = item.Activity,
+                    EligibilityEntryId = item.EligibilityEntryId,
+                    CanClaim = item.CanClaim,
+                    HasActiveTask = item.HasActiveTask,
+                    ClaimButtonEnabled = item.ClaimButtonEnabled,
+                    ActiveTaskProgress = item.ActiveTaskProgress
                 });
             }
             return list;
@@ -501,10 +421,22 @@ namespace DBCacheServer
     internal sealed class PromoGetPlayerOffersPayload
     {
         public string BusinessDay = "";
-        public List<PromoAvailableOfferPayload> AvailableItems = new List<PromoAvailableOfferPayload>();
-        public List<PromoClaimedOfferPayload> ClaimedItems = new List<PromoClaimedOfferPayload>();
         public bool HasActiveBonusTask;
         public string ActiveBonusTaskId = "";
+        public ActiveBonusTaskDto ActiveTask;
+        public List<PromoPlayerPromotionActivityPayload> Activities = new List<PromoPlayerPromotionActivityPayload>();
+        public List<BonusHistoryDto> TodayCompletedItems = new List<BonusHistoryDto>();
+    }
+
+    internal sealed class PromoPlayerPromotionActivityPayload
+    {
+        public long ActivityUID;
+        public ActivitySnapshotDto Activity;
+        public long? EligibilityEntryId;
+        public bool CanClaim;
+        public bool HasActiveTask;
+        public bool ClaimButtonEnabled;
+        public BonusTaskProgressDto ActiveTaskProgress;
     }
 
     internal sealed class PromoGetGamesPayload

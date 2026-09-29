@@ -5,6 +5,7 @@ public interface IPromotionCoreService
     PromotionResult<InitializeData> Initialize(InitializeRequest request);
     PromotionResult<CreateEligibilityData> CreateEligibility(CreateEligibilityRequest request);
     PromotionResult<AvailablePromotionListData> GetAvailablePromotions(GetAvailablePromotionsRequest request);
+    PromotionResult<GetPlayerPromotionPageData> GetPlayerPromotionPage(GetPlayerPromotionPageRequest request);
     PromotionResult<GameServerListData> GetGameServerList(GetGameServerListRequest request);
     PromotionResult<ClaimPromotionData> ClaimPromotion(ClaimPromotionRequest request);
     PromotionResult<BonusTaskStatusData> GetBonusTaskStatus(GetBonusTaskStatusRequest request);

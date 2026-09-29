@@ -80,6 +80,9 @@ public interface IPromotionCoreService
     PromotionResult<AvailablePromotionListData> GetAvailablePromotions(
         GetAvailablePromotionsRequest request);
 
+    PromotionResult<GetPlayerPromotionPageData> GetPlayerPromotionPage(
+        GetPlayerPromotionPageRequest request);
+
     PromotionResult<GameServerListData> GetGameServerList(
         GetGameServerListRequest request);
 
@@ -332,7 +335,48 @@ public sealed record AvailablePromotionDto(
 - 有進行中任務時仍回傳尚有效資格，並透過 `HasActiveBonusTask` 告知目前不可領取。
 - 清單依 `EligibilityEntryId` 遞增；沒有資料時回傳成功及空集合。
 
-### 8.1 查詢活動可玩遊戲列表
+### 8.1 查詢玩家優惠頁
+
+```csharp
+public sealed record GetPlayerPromotionPageRequest(
+    long UserUID,
+    DateTime QueryTime,
+    IReadOnlyCollection<long> VisibleActivityUIDs,
+    bool IncludeTodayCompleted = false,
+    string? CorrelationId = null);
+
+public sealed record GetPlayerPromotionPageData(
+    long UserUID,
+    DateOnly BusinessDay,
+    bool HasAnyActiveBonusTask,
+    ActiveBonusTaskDto? ActiveTask,
+    IReadOnlyList<PlayerPromotionActivityDto> Activities,
+    IReadOnlyList<BonusHistoryDto>? TodayCompletedItems);
+
+public sealed record PlayerPromotionActivityDto(
+    long ActivityUID,
+    ActivitySnapshotDto Activity,
+    long? EligibilityEntryId,
+    bool CanClaim,
+    bool HasActiveTask,
+    bool ClaimButtonEnabled,
+    BonusTaskProgressDto? ActiveTaskProgress);
+
+public sealed record BonusTaskProgressDto(
+    decimal CurrentWagerAmount,
+    decimal RequiredWagerAmount,
+    decimal RemainingWagerAmount);
+```
+
+- `VisibleActivityUIDs` 必須由 Host 依玩家目前所屬代理商授權取得；不得採信前端傳入的活動範圍。空集合代表不顯示任何活動。
+- 每個啟用且在授權範圍內的活動恰回傳一筆，依 `ActivityUID ASC` 排序。重複 ID 會去重；超過 1000 個不重複 ID 或包含非正整數時回傳 `InvalidActivityScope`。
+- `Activity` 提供畫面所需的活動規則欄位。第一版僅顯示 `ActivityStatus = Active` 的活動。
+- 同活動同日有多筆可用資格時，僅回傳 `EligibilityEntryId` 最大的一筆。`CanClaim` 只表示資格已成立；玩家有其他進行中任務時不得將它改為 `false`。
+- `ClaimButtonEnabled = CanClaim && !HasAnyActiveBonusTask`。若目前任務屬於該活動，`HasActiveTask = true` 並提供 `ActiveTaskProgress`，畫面不顯示領取按鈕。
+- `IncludeTodayCompleted = false` 時 `TodayCompletedItems = null` 且不得讀取歷史；為 `true` 時只回傳相同 `UserUID` 與 `BusinessDay` 的完成紀錄。完成紀錄是獨立區塊，不影響主清單狀態。
+- 此為唯讀查詢，不使用交易或 Row Lock。後續領取仍由 `ClaimPromotion` 的交易檢查為準。
+
+### 8.2 查詢活動可玩遊戲列表
 
 ```csharp
 public sealed record GetGameServerListRequest(

@@ -17,7 +17,7 @@ CLIENT 透過 POST /api/wukong/CommonCommand 送出 CommonInfoData，Wukong 經 
 |主動放棄任務|PromoAbandonTaskRequest|PromoAbandonTaskResponse|BonusTaskId|
 |分頁查詢優惠結案歷史|PromoGetHistoryRequest|PromoGetHistoryResponse|FromInclusive、ToExclusive、Offset、 Limit|
 
-Command 區分大小寫。第一個查詢不按玩家是否已觸發、可領或已領過濾；第二個查詢分開回傳 AvailableItems 與 ClaimedItems。 同一活動可有多筆資格，領取時使用 EligibilityEntryId。 PromoClaimRequest 用於領取優惠資格並建立 Bonus Task；PromoClaimUnlockRequest 用於手動解鎖類型達標後領取解鎖金。固定金 額類型維持達標後由後端自動結案與入帳。手動解鎖類型達標後須保留任務並繼續累計已結算流水，直到玩家領取或發生其他結案 條件；此業務規則尚待核心服務實作。
+Command 區分大小寫。兩個優惠頁查詢均以 DBCache 從玩家目前所屬代理商取得的活動授權範圍為準，不接受 CLIENT 提供的活動 ID；同一活動在主清單只會有一筆。`PromoGetActivitiesRequest` 不讀取完成歷史，`PromoGetPlayerOffersRequest` 會附帶本活動日已完成紀錄。領取時使用 `EligibilityEntryId`。PromoClaimRequest 用於領取優惠資格並建立 Bonus Task；PromoClaimUnlockRequest 用於手動解鎖類型達標後領取解鎖金。固定金額類型維持達標後由後端自動結案與入帳。
 
 ## DBCache 到 Game Server 的 CommonInfoData
 
@@ -49,53 +49,24 @@ Request 的 Data 值均為字串；整數與金額使用無千分位的十進位
 |ErrorCode|string|失敗原因；成功時為空字串。|
 |Message|string|人可讀訊息。|
 
-## PromoGetActivitiesResponse
+## PromoGetActivitiesResponse 與 PromoGetPlayerOffersResponse
 
-用途：優惠頁第一塊，顯示玩家所屬代理商在本活動日的所有有效活動。業務篩選由後續 DBCache 開發完成。
-
-|變數|型別|用途|
-|---|---|---|
-|BusinessDay|string|活動日，格式 yyyy-MM-dd。|
-|Items|List<PromoActivit yItem>|活動項目；空陣列代表當日沒有活動。|
-|Items[].ActivityUID|long|活動唯一識別碼。|
-|Items[].ActivityInfo|string|顯示名稱或說明。|
-|Items[].TriggerType|string|觸發類型，例如 Free 或 Deposit。|
-|Items[].BonusType|string|紅利派發類型。|
-|Items[].FixedBonusAmount|int?|固定 Bonus 設定；不適用時為 null。|
-|Items[].DepositPercentage|int?|儲值百分比設定；不適用時為 null。|
-|Items[].MaxBonusAmount|int?|Bonus 上限；不適用時為 null。|
-|Items[].MinimumDepositAmount|int?|最低儲值金額；不適用時為 null。|
-|Items[].WagerMultiplier|int|目標流水的洗碼倍數。|
-|Items[].DailyClaimLimit|int|每活動日可成功領取的次數上限。|
-
-## PromoGetPlayerOffersResponse
-
-用途：優惠頁第二塊，分別顯示玩家本活動日可領資格與已領優惠。已領資料包含進行中與已結案任務；後續由 DBCache 彙整。
+用途：回傳玩家優惠頁的單一主清單。`PromoGetActivitiesResponse` 的 `TodayCompletedItems` 固定為空；`PromoGetPlayerOffersResponse` 會回傳本活動日完成紀錄。
 
 |變數|型別|用途|
 |---|---|---|
-|BusinessDay|string|查詢所屬活動日。|
-|AvailableItems|List<PromoAvaila bleOfferItem>|尚可領取的資格清單。|
-|AvailableItems[].EligibilityEntryId|long|領取時提交的資格 ID。|
-|AvailableItems[].ActivityUID|long|對應活動 ID。|
-|AvailableItems[].EventId|string|建立資格的事件 ID。|
-|AvailableItems[].ActivityInfo|string|活動顯示資訊。|
-|AvailableItems[].TriggerType|string|建立資格的觸發類型。|
-|AvailableItems[].EligibleDepositAmount|decimal?|該資格的合格儲值金額；無儲值時為 null。|
-|AvailableItems[].EstimatedBonusAmount|decimal|查詢當下的預估 Bonus，非領取承諾。|
-|AvailableItems[].EstimatedRequiredWag erAmount|decimal|查詢當下的預估目標流水。|
-|AvailableItems[].MaxBetAmount|int?|活動押注上限；未設定時為 null。|
-|ClaimedItems|List<PromoClaime dOfferItem>|本活動日已領取的資格／任務清單。|
-|ClaimedItems[].EligibilityEntryId|long|原資格 ID。|
-|ClaimedItems[].BonusTaskId|string|領取後建立的任務 ID。|
-|ClaimedItems[].ActivityUID|long|對應活動 ID。|
-|ClaimedItems[].ActivityInfo|string|活動顯示資訊。|
-|ClaimedItems[].BonusAmount|decimal|實際領取 Bonus。|
-|ClaimedItems[].ClaimedAt|string|領取時間，ISO 8601。|
-|ClaimedItems[].TaskState|string|Active 或 Closed 等任務狀態。|
-|ClaimedItems[].CloseReason|string|已結案時的結案原因；進行中為空字串。|
-|HasActiveBonusTask|bool|玩家目前是否有進行中任務。|
+|BusinessDay|string|查詢所屬活動日，格式 yyyy-MM-dd。|
+|HasActiveBonusTask|bool|玩家是否有進行中的 Bonus Task。|
 |ActiveBonusTaskId|string|目前任務 ID；沒有任務時為空字串。|
+|ActiveTask|ActiveBonusTaskDto|null 或唯一一筆進行中任務。|
+|Activities|List<PromoPlayerPromotionActivityPayload>|所有啟用且授權可見的活動，依 ActivityUID 遞增。|
+|Activities[].Activity|ActivitySnapshotDto|活動資訊與畫面規則欄位。|
+|Activities[].EligibilityEntryId|long?|可領資格 ID；為 null 表示不可領。|
+|Activities[].CanClaim|bool|資格是否已成立。|
+|Activities[].HasActiveTask|bool|此活動是否為玩家目前正在進行的任務。|
+|Activities[].ClaimButtonEnabled|bool|前端唯一可用於啟用領取按鈕的旗標。|
+|Activities[].ActiveTaskProgress|BonusTaskProgressDto?|進行中任務的目前／需求／剩餘流水；其他活動為 null。|
+|TodayCompletedItems|List<BonusHistoryDto>|僅玩家優惠頁查詢回傳；不影響主清單資格或按鈕。|
 
 ## PromoGetGamesResponse
 

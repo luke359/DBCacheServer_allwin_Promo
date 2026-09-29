@@ -219,12 +219,14 @@ public sealed partial class PromotionCoreService : IPromotionCoreService
         return Read(correlation, () => new BonusHistoryPageData(request.UserUID, request.FromInclusive,
             request.ToExclusive, request.Offset, request.Limit,
             Freeze(data.GetBonusHistory(request.UserUID, request.FromInclusive, request.ToExclusive, request.Offset, request.Limit)
-                .Select(history => new BonusHistoryDto(history.BonusHistoryId, history.BonusTaskId, history.UserUID,
-                    history.EligibilityEntryId, history.ActivityUID, history.BusinessDay,
-                    ActivitySnapshotSerializer.Deserialize(history.ActivitySnapshotJson), history.BonusAmount,
-                    history.RequiredWagerAmount, history.CurrentWagerAmount, history.ConvertedAmount,
-                    history.CloseReason, history.ClaimedAt, history.ClosedAt)))));
+                .Select(HistoryDto))));
     }
+
+    private static BonusHistoryDto HistoryDto(BonusHistory history) => new(history.BonusHistoryId,
+        history.BonusTaskId, history.UserUID, history.EligibilityEntryId, history.ActivityUID,
+        history.BusinessDay, ActivitySnapshotSerializer.Deserialize(history.ActivitySnapshotJson),
+        history.BonusAmount, history.RequiredWagerAmount, history.CurrentWagerAmount, history.ConvertedAmount,
+        history.CloseReason, history.ClaimedAt, history.ClosedAt);
 
     private static EligibilityEntryDto EntryDto(EligibilityEntry value) => new(value.EligibilityEntryId,
         value.EventId, value.UserUID, value.ActivityUID, value.BusinessDay, value.TriggerType,

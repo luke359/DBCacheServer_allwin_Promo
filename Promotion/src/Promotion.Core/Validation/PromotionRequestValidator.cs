@@ -40,6 +40,18 @@ public static class PromotionRequestValidator
         return Local(request.QueryTime) ? PromotionErrorCode.None : PromotionErrorCode.InvalidDateTime;
     }
 
+    public static PromotionErrorCode Validate(GetPlayerPromotionPageRequest? request)
+    {
+        if (request is null) return PromotionErrorCode.RequestNull;
+        if (request.UserUID <= 0) return PromotionErrorCode.InvalidUserUID;
+        if (Correlation(request.CorrelationId) != PromotionErrorCode.None) return PromotionErrorCode.InvalidIdentifier;
+        if (!Local(request.QueryTime)) return PromotionErrorCode.InvalidDateTime;
+        if (request.VisibleActivityUIDs is null) return PromotionErrorCode.InvalidActivityScope;
+        var activityUids = request.VisibleActivityUIDs;
+        return activityUids.Any(id => id <= 0) || activityUids.Distinct().Count() > 1000
+            ? PromotionErrorCode.InvalidActivityScope : PromotionErrorCode.None;
+    }
+
     public static PromotionErrorCode Validate(GetGameServerListRequest? request)
     {
         if (request is null) return PromotionErrorCode.RequestNull;
