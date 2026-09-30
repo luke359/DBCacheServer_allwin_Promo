@@ -54,6 +54,17 @@ public sealed class PromotionCoreServiceRetryTests
     }
 
     [Fact]
+    public void SwitchableDiagnosticsCanBeEnabledAndDisabled()
+    {
+        var diagnostics = new SwitchablePromotionDiagnostics();
+        Assert.True(diagnostics.Enabled);
+        diagnostics.SetEnabled(false);
+        Assert.False(diagnostics.Enabled);
+        diagnostics.SetEnabled(true);
+        Assert.True(diagnostics.Enabled);
+    }
+
+    [Fact]
     public void CommitUnknownWithExistingEventRecoversWithoutRepeatingAction()
     {
         var store = new ScriptedStore(PromotionDataErrorKind.CommitOutcomeUnknown);

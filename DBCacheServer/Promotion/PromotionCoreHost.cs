@@ -15,6 +15,7 @@ namespace DBCacheServer
     {
         private static readonly object Sync = new object();
         private static readonly BalanceConvertFormula BalanceFormula = ConvertBalance;
+        private static readonly SwitchablePromotionDiagnostics promotionDiagnostics = new();
 
         private static IPromotionV2Gateway gateway;
         private static IPromotionCoreService service;
@@ -27,6 +28,8 @@ namespace DBCacheServer
 
         public static bool IsReady => ready;
         public static IPromotionCoreService Service => service;
+        public static bool PromotionDiagnosticsEnabled => promotionDiagnostics.Enabled;
+        public static void SetPromotionDiagnosticsEnabled(bool enabled) => promotionDiagnostics.SetEnabled(enabled);
 
         /// <summary>開機建構核心服務並呼叫 Initialize。失敗時維持 NotReady，不中斷 DBCache 開機。</summary>
         public static void BuildAndInitialize(TimeSpan businessDayCutover)
@@ -42,7 +45,7 @@ namespace DBCacheServer
                     IPromotionV2Gateway builtGateway = new PromotionV2Gateway(mysql);
                     IPromotionDataStore dataStore = new PromotionMySqlDataStore(builtGateway);
                     IPromotionCoreService core = new PromotionCoreService(dataStore,
-                        diagnostics: new ConsolePromotionDiagnostics());
+                        diagnostics: promotionDiagnostics);
 
                     PromotionResult<InitializeData> initializeResult = core.Initialize(new InitializeRequest(
                         BusinessDayCutover: businessDayCutover,

@@ -13430,6 +13430,25 @@ namespace DBCacheServer
                 string argument = ricevieData.webInfo.AwardResult.Substring("promotion:".Length);
                 response = RunPromotionClientResponseTest(argument);
             }
+            else if (ricevieData.webInfo.AwardResult.Equals("promotiondiag:on", StringComparison.OrdinalIgnoreCase))
+            {
+                PromotionCoreHost.SetPromotionDiagnosticsEnabled(true);
+                response = "Promotion diagnostics enabled.";
+            }
+            else if (ricevieData.webInfo.AwardResult.Equals("promotiondiag:off", StringComparison.OrdinalIgnoreCase))
+            {
+                PromotionCoreHost.SetPromotionDiagnosticsEnabled(false);
+                response = "Promotion diagnostics disabled.";
+            }
+            else if (ricevieData.webInfo.AwardResult.Equals("promotiondiag:status", StringComparison.OrdinalIgnoreCase))
+            {
+                response = "Promotion diagnostics " +
+                    (PromotionCoreHost.PromotionDiagnosticsEnabled ? "enabled." : "disabled.");
+            }
+            else if (ricevieData.webInfo.AwardResult.StartsWith("promotiondiag:", StringComparison.OrdinalIgnoreCase))
+            {
+                response = "Invalid promotion diagnostics command. Use promotiondiag:on, promotiondiag:off, or promotiondiag:status.";
+            }
             else
             {
                 response = "Unknow Command!";
