@@ -40,6 +40,20 @@ public sealed class PromotionCoreServiceRetryTests
     }
 
     [Fact]
+    public void DataCorruptionIsRecordedBeforeItBecomesAPublicError()
+    {
+        var diagnostics = new RecordingDiagnostics();
+        var result = Ready(new ScriptedStore(PromotionDataErrorKind.DataCorruption), new RecordingDelay(), diagnostics)
+            .CreateEligibility(Request());
+
+        Assert.Equal(PromotionErrorCode.DataCorruption, result.ErrorCode);
+        var failure = Assert.Single(diagnostics.Failures);
+        Assert.Equal("same-correlation", failure.CorrelationId);
+        Assert.Equal(PromotionErrorCode.DataCorruption, failure.ErrorCode);
+        Assert.IsType<PromotionDataException>(failure.Exception);
+    }
+
+    [Fact]
     public void CommitUnknownWithExistingEventRecoversWithoutRepeatingAction()
     {
         var store = new ScriptedStore(PromotionDataErrorKind.CommitOutcomeUnknown);
@@ -229,9 +243,10 @@ public sealed class PromotionCoreServiceRetryTests
     private static CreateEligibilityRequest Request() => new("retry-event", 10001,
         TriggerType.Free, Now, null, Array.Empty<long>(), "same-correlation");
 
-    private static PromotionCoreService Ready(ScriptedStore store, RecordingDelay delay)
+    private static PromotionCoreService Ready(ScriptedStore store, RecordingDelay delay,
+        IPromotionDiagnostics? diagnostics = null)
     {
-        var service = new PromotionCoreService(store, new FixedClock(), null, delay, new ZeroJitter());
+        var service = new PromotionCoreService(store, new FixedClock(), null, delay, new ZeroJitter(), diagnostics);
         Assert.Equal(PromotionResultKind.Succeeded, service.Initialize(new InitializeRequest(TimeSpan.Zero, _ => 0)).Kind);
         return service;
     }
@@ -242,6 +257,13 @@ public sealed class PromotionCoreServiceRetryTests
     {
         public List<TimeSpan> Delays { get; } = new();
         public void Delay(TimeSpan duration) => Delays.Add(duration);
+    }
+
+    private sealed class RecordingDiagnostics : IPromotionDiagnostics
+    {
+        public List<(string CorrelationId, PromotionErrorCode ErrorCode, Exception Exception)> Failures { get; } = new();
+        public void RecordFailure(string correlationId, PromotionErrorCode errorCode, Exception exception) =>
+            Failures.Add((correlationId, errorCode, exception));
     }
 
     private sealed class ScriptedStore : IPromotionDataStore

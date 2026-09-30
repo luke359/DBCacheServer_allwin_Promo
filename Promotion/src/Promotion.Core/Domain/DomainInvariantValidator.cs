@@ -7,30 +7,40 @@ public static class DomainInvariantValidator
     public static void ValidateActivity(PromotionActivity value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        if (value.ActivityUID <= 0 || value.ActivityInfo?.Length > 100 ||
-            !Enum.IsDefined(value.BonusType) || !Enum.IsDefined(value.ConvertType) ||
-            !Enum.IsDefined(value.WagerCalculationType) ||
-            !Enum.IsDefined(value.ActivityStatus) ||
-            !Enum.IsDefined(value.TriggerType) ||
-            !Between(value.FixedBonusAmount, 1, 100) || !Between(value.MaxBonusAmount, 1, 100) ||
-            !Between(value.DepositPercentage, 1, 1000) ||
-            !Between(value.WagerMultiplier, 1, 100) ||
-            value.MaxBetAmount is { } maxBet && !Between(maxBet, 1, 100) ||
-            value.GameServerList?.Length > 500 ||
-            value.WagerContributionRate is < 1m or > 100m ||
-            !Between(value.FixedConvertedAmount, 1, 1000) ||
-            value.MaxBalanceConvertedAmount is { } maxBalance && !Between(maxBalance, 1, 1000) ||
-            !Between(value.DailyClaimLimit, 1, 99) ||
-            value.WagerContributionRate != PromotionAmountCalculator.Truncate4(value.WagerContributionRate) ||
-            value.WeekdayMask is null || value.WeekdayMask.Length != 7 ||
-            value.WeekdayMask.Any(c => c is not '0' and not '1') ||
-            value.ExclusiveGroup?.Length > 64 ||
-            value.StartDate is { } start && value.EndDate is { } end && start >= end ||
-            value.CreatedAt.Kind == DateTimeKind.Utc || value.UpdatedAt.Kind == DateTimeKind.Utc ||
-            value.MinimumDepositAmount is { } minimum && minimum <= 0 ||
-            value.TriggerType is TriggerType.Deposit or TriggerType.FirstDepositOfBusinessDay && value.MinimumDepositAmount is null ||
-            value.TriggerType == TriggerType.Free && value.MinimumDepositAmount is not null)
-            throw new DomainInvariantException("Invalid PromotionActivity.");
+        var invalidFields = new List<string>();
+        if (value.ActivityUID <= 0) invalidFields.Add(nameof(value.ActivityUID));
+        if (value.ActivityInfo?.Length > 100) invalidFields.Add(nameof(value.ActivityInfo));
+        if (!Enum.IsDefined(value.BonusType)) invalidFields.Add(nameof(value.BonusType));
+        if (!Enum.IsDefined(value.ConvertType)) invalidFields.Add(nameof(value.ConvertType));
+        if (!Enum.IsDefined(value.WagerCalculationType)) invalidFields.Add(nameof(value.WagerCalculationType));
+        if (!Enum.IsDefined(value.ActivityStatus)) invalidFields.Add(nameof(value.ActivityStatus));
+        if (!Enum.IsDefined(value.TriggerType)) invalidFields.Add(nameof(value.TriggerType));
+        if (!Between(value.FixedBonusAmount, 1, 100)) invalidFields.Add(nameof(value.FixedBonusAmount));
+        if (!Between(value.MaxBonusAmount, 1, 100)) invalidFields.Add(nameof(value.MaxBonusAmount));
+        if (!Between(value.DepositPercentage, 1, 1000)) invalidFields.Add(nameof(value.DepositPercentage));
+        if (!Between(value.WagerMultiplier, 1, 100)) invalidFields.Add(nameof(value.WagerMultiplier));
+        if (value.MaxBetAmount is { } maxBet && !Between(maxBet, 1, 100)) invalidFields.Add(nameof(value.MaxBetAmount));
+        if (value.GameServerList?.Length > 500) invalidFields.Add(nameof(value.GameServerList));
+        if (value.WagerContributionRate is < 1m or > 100m ||
+            value.WagerContributionRate != PromotionAmountCalculator.Truncate4(value.WagerContributionRate))
+            invalidFields.Add(nameof(value.WagerContributionRate));
+        if (!Between(value.FixedConvertedAmount, 1, 1000)) invalidFields.Add(nameof(value.FixedConvertedAmount));
+        if (value.MaxBalanceConvertedAmount is { } maxBalance && !Between(maxBalance, 1, 1000)) invalidFields.Add(nameof(value.MaxBalanceConvertedAmount));
+        if (!Between(value.DailyClaimLimit, 1, 99)) invalidFields.Add(nameof(value.DailyClaimLimit));
+        if (value.WeekdayMask is null || value.WeekdayMask.Length != 7 ||
+            value.WeekdayMask.Any(c => c is not '0' and not '1')) invalidFields.Add(nameof(value.WeekdayMask));
+        if (value.ExclusiveGroup?.Length > 64) invalidFields.Add(nameof(value.ExclusiveGroup));
+        if (value.StartDate is { } start && value.EndDate is { } end && start >= end) invalidFields.Add("StartDate/EndDate");
+        if (value.CreatedAt.Kind == DateTimeKind.Utc) invalidFields.Add(nameof(value.CreatedAt));
+        if (value.UpdatedAt.Kind == DateTimeKind.Utc) invalidFields.Add(nameof(value.UpdatedAt));
+        if (value.MinimumDepositAmount is { } minimum && minimum <= 0) invalidFields.Add(nameof(value.MinimumDepositAmount));
+        if (value.TriggerType is TriggerType.Deposit or TriggerType.FirstDepositOfBusinessDay &&
+            value.MinimumDepositAmount is null) invalidFields.Add(nameof(value.MinimumDepositAmount));
+        if (value.TriggerType == TriggerType.Free && value.MinimumDepositAmount is not null)
+            invalidFields.Add(nameof(value.MinimumDepositAmount));
+
+        if (invalidFields.Count > 0)
+            throw new DomainInvariantException($"Invalid PromotionActivity. ActivityUID={value.ActivityUID}; invalid fields: {string.Join(", ", invalidFields.Distinct())}.");
     }
 
     public static void ValidateEligibility(EligibilityEntry value)

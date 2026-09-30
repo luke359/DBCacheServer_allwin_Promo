@@ -41,7 +41,8 @@ namespace DBCacheServer
                     MysqlAcess mysql = MysqlAcess.GetInstance();
                     IPromotionV2Gateway builtGateway = new PromotionV2Gateway(mysql);
                     IPromotionDataStore dataStore = new PromotionMySqlDataStore(builtGateway);
-                    IPromotionCoreService core = new PromotionCoreService(dataStore);
+                    IPromotionCoreService core = new PromotionCoreService(dataStore,
+                        diagnostics: new ConsolePromotionDiagnostics());
 
                     PromotionResult<InitializeData> initializeResult = core.Initialize(new InitializeRequest(
                         BusinessDayCutover: businessDayCutover,

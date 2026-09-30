@@ -13424,6 +13424,12 @@ namespace DBCacheServer
                     response = $"Invalid UserUID: {userid}";
                 }
             }
+            else if (ricevieData.webInfo.AwardResult.StartsWith("promotion:"))
+            {
+                //正式優惠回覆測試。主體在 Promotion/PromotionServerCommandTest.cs
+                string argument = ricevieData.webInfo.AwardResult.Substring("promotion:".Length);
+                response = RunPromotionClientResponseTest(argument);
+            }
             else
             {
                 response = "Unknow Command!";

@@ -134,7 +134,7 @@ public sealed partial class PromotionCoreService
         throw new InvalidOperationException("Maintenance close outcome cannot be determined.");
     }
 
-    private static MaintenanceFailureDto MaintenanceFailure(MaintenanceStage stage, long? userUid,
+    private MaintenanceFailureDto MaintenanceFailure(MaintenanceStage stage, long? userUid,
         string? taskId, Exception ex, string correlation)
     {
         var result = FailureFrom<object>(correlation, ex);

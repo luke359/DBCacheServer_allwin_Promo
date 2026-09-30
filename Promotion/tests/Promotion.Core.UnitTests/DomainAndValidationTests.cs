@@ -98,8 +98,9 @@ public sealed class DomainAndValidationTests
     [Fact]
     public void BD_014_InvalidActivityIsRejected()
     {
-        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+        var weekdayMaskError = Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
             TestActivity.Create() with { WeekdayMask = "11111x1" }));
+        Assert.Equal("Invalid PromotionActivity. ActivityUID=20001; invalid fields: WeekdayMask.", weekdayMaskError.Message);
         Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
             TestActivity.Create() with { EndDate = new DateOnly(2026, 8, 31) }));
         Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(

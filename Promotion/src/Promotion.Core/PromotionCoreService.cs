@@ -21,19 +21,22 @@ public sealed partial class PromotionCoreService : IPromotionCoreService
     private readonly IGuidProvider guids;
     private readonly IRetryDelay retryDelay;
     private readonly IJitterSource jitter;
+    private readonly IPromotionDiagnostics diagnostics;
     private readonly object initializeSync = new();
     private TimeSpan cutover;
     private BalanceConvertFormula? balanceFormula;
     private bool initialized;
 
     public PromotionCoreService(IPromotionDataStore data, ILocalClock? clock = null,
-        IGuidProvider? guids = null, IRetryDelay? retryDelay = null, IJitterSource? jitter = null)
+        IGuidProvider? guids = null, IRetryDelay? retryDelay = null, IJitterSource? jitter = null,
+        IPromotionDiagnostics? diagnostics = null)
     {
         this.data = data ?? throw new ArgumentNullException(nameof(data));
         this.clock = clock ?? new SystemLocalClock();
         this.guids = guids ?? new SystemGuidProvider();
         this.retryDelay = retryDelay ?? new ThreadRetryDelay();
         this.jitter = jitter ?? new RandomJitterSource();
+        this.diagnostics = diagnostics ?? NullPromotionDiagnostics.Instance;
     }
 
     private string Correlation(string? supplied) => supplied ?? guids.NewGuid().ToString("D");
@@ -297,11 +300,11 @@ public sealed partial class PromotionCoreService : IPromotionCoreService
         return PromotionResultFactory.Failure<T>(correlation, PromotionErrorCode.UnexpectedError);
     }
 
-    private static PromotionResult<T> FailureFrom<T>(string correlation, Exception ex)
+    private PromotionResult<T> FailureFrom<T>(string correlation, Exception ex)
     {
-        if (ex is PromotionDataException dataError)
+        var code = ex switch
         {
-            var code = dataError.Kind switch
+            PromotionDataException dataError => dataError.Kind switch
             {
                 PromotionDataErrorKind.Deadlock => PromotionErrorCode.DatabaseDeadlock,
                 PromotionDataErrorKind.LockWaitTimeout => PromotionErrorCode.DatabaseLockWaitTimeout,
@@ -311,13 +314,13 @@ public sealed partial class PromotionCoreService : IPromotionCoreService
                 PromotionDataErrorKind.InvalidBonusTaskState => PromotionErrorCode.InvalidBonusTaskState,
                 PromotionDataErrorKind.DuplicateKey or PromotionDataErrorKind.ConcurrencyConflict => PromotionErrorCode.DataIntegrityConflict,
                 _ => PromotionErrorCode.UnexpectedError
-            };
-            return PromotionResultFactory.Failure<T>(correlation, code);
-        }
-        if (ex is BalanceConvertFormulaException)
-            return PromotionResultFactory.Failure<T>(correlation, PromotionErrorCode.BalanceConvertFormulaFailed);
-        if (ex is DomainInvariantException or UnsupportedSnapshotVersionException)
-            return PromotionResultFactory.Failure<T>(correlation, PromotionErrorCode.DataCorruption);
-        return PromotionResultFactory.Failure<T>(correlation, PromotionErrorCode.UnexpectedError);
+            },
+            BalanceConvertFormulaException => PromotionErrorCode.BalanceConvertFormulaFailed,
+            DomainInvariantException or UnsupportedSnapshotVersionException => PromotionErrorCode.DataCorruption,
+            _ => PromotionErrorCode.UnexpectedError
+        };
+        try { diagnostics.RecordFailure(correlation, code, ex); }
+        catch { /* Diagnostics must not change the business result. */ }
+        return PromotionResultFactory.Failure<T>(correlation, code);
     }
 }
