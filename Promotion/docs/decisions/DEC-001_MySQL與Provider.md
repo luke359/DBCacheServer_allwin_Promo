@@ -15,7 +15,7 @@
 
 ## 本機驗證紀錄（尚非正式環境決策）
 
-- 2026-09-16：DBCacheServer 目標為 `net6.0`，`MysqlAcess` 使用 `MySql.Data` 9.4.0。
+- 2026-09-16：DBCacheServer 目標為 `net10.0`，`MysqlAcess` 使用 `MySql.Data` 9.4.0。
 - 使用使用者提供的本機連線檔唯讀查詢：MySQL Server 為 9.7.0，`sql_mode` 為 `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION`，`lower_case_table_names=1`。
 - V001 已在獨立的 `promotion_test_20260916161130_ef34d7cf` 套用並通過結構驗證；此證據不代表正式環境版本已確認。
-- `MySql.Data` 9.4.0 在本方案 `net6.0` 整合測試專案還原出的部分相依套件會發出目標框架支援警告；即使測試通過，零警告發布關卡仍未滿足。不得透過隱藏警告宣稱完成，需由 Tech Lead／DBA 決定相容版本組合並同步上游規格與 Host。
+- `MySql.Data` 9.4.0 在本方案 `net10.0` 整合測試專案還原出的部分相依套件會發出目標框架支援警告；即使測試通過，零警告發布關卡仍未滿足。不得透過隱藏警告宣稱完成，需由 Tech Lead／DBA 決定相容版本組合並同步上游規格與 Host。

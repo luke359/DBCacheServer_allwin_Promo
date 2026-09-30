@@ -1,6 +1,6 @@
 # Promotion Core 實作狀態
 
-此目錄以 PCS-01～PCS-07 為規格來源，使用 C# 10、.NET 6 與 UTF-8。
+此目錄以 PCS-01～PCS-07 為規格來源，使用 C# 10、.NET 10 與 UTF-8。
 
 目前已建立 P0 的獨立 Solution(方案)骨架、中央套件版本與鎖定檔，以及 P1／P2 的公開契約、領域模型、純計算、快照與輸入驗證。依更新的企劃案，兩個上限已改為 `null` 表示無限制，新增 `GameServerList` 查詢契約與 `WagerCalculationType`，新快照為版本 2 並保留版本 1 讀取能力。P3 已包含 V001 建表、V002 活動欄位升級、V003 獎勵表更名，以及 V004 在 PromotionBonusStatus 保存每日首登入／首儲最近 Business Day；每日維護不清除這兩個日期。P4 已在 DBCache 專案新增 `MysqlAcess` partial V2、型別化參數與交易 Context。P5 核心專用 MySQL Adapter、DBCache V2 橋接、五表 Mapper 與本機可獨立執行的驗收已完成；完整 DB-009～DB-030 清單仍包含 P4 限制與 P6 流程相依案例。P6 Facade 本機階段驗收已完成；P7 的 DBCache Host 整合位於 `DBCacheServer/Promotion/PromotionCoreHost.cs`，不再保留獨立的 `Promotion.Host.DBCache` 專案。公開 `IPromotionCoreService` 是契約。
 
@@ -33,7 +33,7 @@ P3／P4 整合測試從環境變數 `PROMOTION_TEST_MYSQL_CONNECTION_STRING` 取
 
 P4 依使用者核准調整為 V2 每次呼叫使用獨立 Connection；不再依賴舊 `ReConnect` 會重新指派的共用 Mutex。舊 `MysqlAcess` 方法本體保持不變，因此尚不能全面阻止 V2 交易 action 混用舊 API；舊 API 操作也不會加入 V2 Transaction。進入正式 Host 接線前，須以架構／程式審查禁止此類混用，不能把初步 V2 測試通過視為可上線。
 
-工作指引的正式環境 MySQL／Provider 決策仍未簽核；`MySql.Data` 9.4.0 與 `net6.0` 組合在整合測試建置出現相依套件支援警告，零警告關卡尚未通過。已提供只限空資料測試庫的受控回復腳本，但未執行回復。
+工作指引的正式環境 MySQL／Provider 決策仍未簽核；`MySql.Data` 9.4.0 與 `net10.0` 組合在整合測試建置出現相依套件支援警告，零警告關卡尚未通過。已提供只限空資料測試庫的受控回復腳本，但未執行回復。
 
 P4 V2 本階段的測試與未滿足條件詳見 [P4 驗收紀錄](docs/P4_MysqlAcess_V2驗收紀錄.md)。DB-009～DB-030 包含尚未實作的 P5 Adapter 案例，不得將 V2 測試通過視為完整 DB 清單通過。
 

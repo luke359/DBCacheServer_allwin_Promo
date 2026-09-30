@@ -28,13 +28,13 @@ Command 區分大小寫。兩個優惠頁查詢均以 DBCache 從玩家目前所
 |UserUID|int|指定玩家；Wukong 先核對登入身分，DBCache 不採信 Data 另填的玩家或代理商 ID。|
 |GameServer|GameServerCode|指定 Game Server；Wukong 轉送時填入自身代碼。|
 |Data["RequestId"]|string|可選的非同步請求識別；DBCache 原樣帶回，不作為領取、領取解鎖金或放棄的業 務冪等鍵。|
-|Data["Payload"]|JSON string|成功回覆的業務欄位，結構對應同名的 WebProtocol Response 物件；Game Server 反序列化後送出。|
-|Data["ErrorCode"]|string|失敗時的錯誤碼；成功時不帶。|
+|Data["Payload"]|JSON string|核心業務產生的回覆欄位，結構對應同名的 WebProtocol Response 物件；Game Server 反序列化後送出。錢包指令失敗時仍可能與 ErrorCode 同時存在。|
+|Data["ErrorCode"]|string|處理未完全成功時的錯誤碼；核心業務成功但錢包指令失敗時會與 Payload 同時帶回。|
 |Data["IsMock"]|string|假回覆時為 true；正式回覆不帶或為 false。|
 |Message|string|人可讀說明；不作為業務狀態判斷。|
 |Type、MachineUID|int|優惠通訊暫不使用。|
 
-Request 的 Data 值均為字串；整數與金額使用無千分位的十進位格式，日期用 yyyy-MM-dd，時間用 ISO 8601。Game Server 轉換失 敗時，仍回覆對應的專用 Response 類別，並填 InvalidResponsePayload 或 MissingResponsePayload。
+Request 的 Data 值均為字串；整數與金額使用無千分位的十進位格式，日期用 yyyy-MM-dd，時間用 ISO 8601。Game Server 轉換失 敗時，仍回覆對應的專用 Response 類別，並填 InvalidResponsePayload 或 MissingResponsePayload。完整的 ErrorCode／Payload 判斷順序見 `Promotion.ResponseDecoder 解包規格.md`；尤其 ErrorCode 與 Payload 同時存在時，仍須解析 Payload。
 
 ## 所有 Response 共用欄位
 

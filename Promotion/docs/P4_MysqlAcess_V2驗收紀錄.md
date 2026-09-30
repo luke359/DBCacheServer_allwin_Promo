@@ -28,4 +28,4 @@
 
 1. Host／Adapter 不得在 `ExecuteParameterizedTransaction` 的 action 中呼叫任何舊 `MysqlAcess` API；這項規則目前無法由 V2 執行時完全強制。
 2. 不得把 P4 V2 的方案測試通過解讀為 DB-009～DB-030 全部通過或正式環境可部署。
-3. `net6.0` 搭配目前 `MySql.Data` 9.4.0 的相依套件仍有支援警告；DEC-001 的正式 Provider／版本決策尚未簽核。
+3. `net10.0` 搭配目前 `MySql.Data` 9.4.0 的相依套件仍有支援警告；DEC-001 的正式 Provider／版本決策尚未簽核。

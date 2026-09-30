@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -25,7 +26,7 @@ namespace DBCacheServer
                 text = "promotion test failed: " + ex.GetType().Name + " " + ex.Message;
             }
 
-            MyConsole.WriteLine(text);
+            //MyConsole.WriteLine(text);
             return text;
         }
 
@@ -141,11 +142,11 @@ namespace DBCacheServer
 
             foreach (KeyValuePair<string, string> pair in data)
             {
-                builder.AppendLine();
+                builder.AppendLine("<br>");
                 builder.Append(pair.Key).Append("=");
                 if (prettyPayload && pair.Key == "Payload")
                 {
-                    builder.AppendLine();
+                    builder.AppendLine("<br>");
                     builder.Append(PrettyPromotionPayload(pair.Value));
                 }
                 else
@@ -161,7 +162,24 @@ namespace DBCacheServer
                 return "";
             try
             {
-                return JToken.Parse(payload).ToString(Formatting.Indented);
+                string pretty = WebUtility.HtmlEncode(JToken.Parse(payload).ToString(Formatting.Indented));
+                string[] lines = pretty.Replace("\r\n", "\n").Split('\n');
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (i > 0)
+                        builder.Append("<br>");
+
+                    string line = lines[i];
+                    int indent = 0;
+                    while (indent < line.Length && line[indent] == ' ')
+                        indent++;
+
+                    for (int space = 0; space < indent; space++)
+                        builder.Append("&nbsp;");
+                    builder.Append(line, indent, line.Length - indent);
+                }
+                return builder.ToString();
             }
             catch (JsonException)
             {

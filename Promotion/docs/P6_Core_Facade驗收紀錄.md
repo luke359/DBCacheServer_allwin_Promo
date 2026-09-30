@@ -19,4 +19,4 @@
 ## 後續階段
 
 - P7 的 DBCache Request Adapter 與核心初始化已整合於 `DBCacheServer/Promotion/PromotionCoreHost.cs`；Wallet Instruction 的可靠保存、Dispatcher 與對帳仍須依實際 DBCache 流程完成與驗證。
-- P8 依 PCS-06 逐項執行完整案例矩陣及 50 回併發壓力驗證。DEC-001 正式 MySQL／Provider 版本簽核與既有 `net6.0` 套件支援警告仍須在正式部署前處理。
+- P8 依 PCS-06 逐項執行完整案例矩陣及 50 回併發壓力驗證。DEC-001 正式 MySQL／Provider 版本簽核與既有 `net10.0` 套件支援警告仍須在正式部署前處理。
