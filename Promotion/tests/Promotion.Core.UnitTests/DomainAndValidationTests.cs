@@ -108,6 +108,37 @@ public sealed class DomainAndValidationTests
     }
 
     [Fact]
+    public void ActivityValidatesOnlyAmountsUsedByBonusAndConversionTypes()
+    {
+        var activity = TestActivity.Create();
+
+        var fixedBonus = activity with
+        {
+            BonusType = BonusType.FixedAmount, MaxBonusAmount = int.MinValue, DepositPercentage = int.MaxValue
+        };
+        DomainInvariantValidator.ValidateActivity(fixedBonus);
+        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+            fixedBonus with { FixedBonusAmount = 0 }));
+
+        var percentageBonus = activity with { BonusType = BonusType.DepositPercentage, FixedBonusAmount = int.MinValue };
+        DomainInvariantValidator.ValidateActivity(percentageBonus);
+        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+            percentageBonus with { MaxBonusAmount = 0 }));
+        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+            percentageBonus with { DepositPercentage = 0 }));
+
+        var fixedConversion = activity with { ConvertType = ConvertType.Fixed, MaxBalanceConvertedAmount = int.MinValue };
+        DomainInvariantValidator.ValidateActivity(fixedConversion);
+        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+            fixedConversion with { FixedConvertedAmount = 0 }));
+
+        var balanceConversion = activity with { ConvertType = ConvertType.Balance, FixedConvertedAmount = int.MinValue };
+        DomainInvariantValidator.ValidateActivity(balanceConversion);
+        Assert.Throws<DomainInvariantException>(() => DomainInvariantValidator.ValidateActivity(
+            balanceConversion with { MaxBalanceConvertedAmount = 0 }));
+    }
+
+    [Fact]
     public void NewActivityFieldsAndLegacySnapshotAreValidated()
     {
         var activity = TestActivity.Create() with

@@ -15,17 +15,22 @@ public static class DomainInvariantValidator
         if (!Enum.IsDefined(value.WagerCalculationType)) invalidFields.Add(nameof(value.WagerCalculationType));
         if (!Enum.IsDefined(value.ActivityStatus)) invalidFields.Add(nameof(value.ActivityStatus));
         if (!Enum.IsDefined(value.TriggerType)) invalidFields.Add(nameof(value.TriggerType));
-        if (!Between(value.FixedBonusAmount, 1, 100)) invalidFields.Add(nameof(value.FixedBonusAmount));
-        if (!Between(value.MaxBonusAmount, 1, 100)) invalidFields.Add(nameof(value.MaxBonusAmount));
-        if (!Between(value.DepositPercentage, 1, 1000)) invalidFields.Add(nameof(value.DepositPercentage));
+        if (value.BonusType == BonusType.FixedAmount && !Between(value.FixedBonusAmount, 1, 1000))
+            invalidFields.Add(nameof(value.FixedBonusAmount));
+        if (value.BonusType == BonusType.DepositPercentage && !Between(value.MaxBonusAmount, 1, 1000))
+            invalidFields.Add(nameof(value.MaxBonusAmount) + "=" + value.MaxBonusAmount);
+        if (value.BonusType == BonusType.DepositPercentage && !Between(value.DepositPercentage, 1, 1000))
+            invalidFields.Add(nameof(value.DepositPercentage));
         if (!Between(value.WagerMultiplier, 1, 100)) invalidFields.Add(nameof(value.WagerMultiplier));
-        if (value.MaxBetAmount is { } maxBet && !Between(maxBet, 1, 100)) invalidFields.Add(nameof(value.MaxBetAmount));
-        if (value.GameServerList?.Length > 500) invalidFields.Add(nameof(value.GameServerList));
+        if (value.MaxBetAmount is { } maxBet && !Between(maxBet, 1, 1000)) invalidFields.Add(nameof(value.MaxBetAmount));
+        if (value.GameServerList?.Length > 1000) invalidFields.Add(nameof(value.GameServerList));
         if (value.WagerContributionRate is < 1m or > 100m ||
             value.WagerContributionRate != PromotionAmountCalculator.Truncate4(value.WagerContributionRate))
             invalidFields.Add(nameof(value.WagerContributionRate));
-        if (!Between(value.FixedConvertedAmount, 1, 1000)) invalidFields.Add(nameof(value.FixedConvertedAmount));
-        if (value.MaxBalanceConvertedAmount is { } maxBalance && !Between(maxBalance, 1, 1000)) invalidFields.Add(nameof(value.MaxBalanceConvertedAmount));
+        if (value.ConvertType == ConvertType.Fixed && !Between(value.FixedConvertedAmount, 1, 1000))
+            invalidFields.Add(nameof(value.FixedConvertedAmount));
+        if (value.ConvertType == ConvertType.Balance && value.MaxBalanceConvertedAmount is { } maxBalance &&
+            !Between(maxBalance, 1, 1000)) invalidFields.Add(nameof(value.MaxBalanceConvertedAmount));
         if (!Between(value.DailyClaimLimit, 1, 99)) invalidFields.Add(nameof(value.DailyClaimLimit));
         if (value.WeekdayMask is null || value.WeekdayMask.Length != 7 ||
             value.WeekdayMask.Any(c => c is not '0' and not '1')) invalidFields.Add(nameof(value.WeekdayMask));
