@@ -1,0 +1,13 @@
+{
+  "EligibilityEntryId": 2001,
+  "BonusTaskId": "TASK-2001",
+  "ActivityUID": 1001,
+  "BusinessDay": "2026-10-01",
+  "BonusAmount": 10.0,
+  "RequiredWagerAmount": 300.0,
+  "CurrentWagerAmount": 0.0,
+  "RemainingWagerAmount": 300.0,
+  "MaxBetAmount": 5,
+  "ClaimedAt": "2026-10-01T08:00:00.0000000",
+  "IsReplay": false
+}

@@ -1,0 +1,8 @@
+{
+  "BonusTaskId": "TASK-2001",
+  "CloseReason": "PlayerAbandoned",
+  "FinalCurrentWagerAmount": 120.0,
+  "ConvertedAmount": 0.0,
+  "ClosedAt": "2026-10-01T08:00:00.0000000",
+  "AlreadyClosed": false
+}

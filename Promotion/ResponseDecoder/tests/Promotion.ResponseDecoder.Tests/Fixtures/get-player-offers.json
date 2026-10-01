@@ -1,0 +1,28 @@
+{
+  "BusinessDay": "2026-10-01",
+  "HasActiveBonusTask": false,
+  "ActiveBonusTaskId": "",
+  "ActiveTask": null,
+  "Activities": [
+    {
+      "ActivityUID": 1001,
+      "Activity": {
+        "ActivityInfo": "Welcome bonus",
+        "BonusType": 1,
+        "FixedBonusAmount": 10,
+        "MaxBonusAmount": 0,
+        "DepositPercentage": 0,
+        "MinimumDepositAmount": null,
+        "WagerMultiplier": 30,
+        "MaxBetAmount": 5,
+        "DailyClaimLimit": 1
+      },
+      "EligibilityEntryId": 2001,
+      "CanClaim": true,
+      "HasActiveTask": false,
+      "ClaimButtonEnabled": true,
+      "ActiveTaskProgress": null
+    }
+  ],
+  "TodayCompletedItems": []
+}
