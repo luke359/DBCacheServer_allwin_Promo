@@ -2,7 +2,7 @@
 
 ## 目的與適用範圍
 
-本文件定義 `Promotion.ResponseDecoder` 函式庫收到優惠 Common 回覆後，如何解析 `Command`、`Data["ErrorCode"]` 與 `Data["Payload"]`，並產生中立的解包結果。
+本文件定義 `Promotion.ResponseDecoder` 函式庫在 DBCache→Game Server 的 `CommonInfoData` 區段收到優惠回覆後，如何解析 `Command`、`Data["ErrorCode"]` 與 `Data["Payload"]`，並產生中立的解包結果。Game Server→CLIENT 的 `WebProtocol`／SignalR 區段是另一份契約，由各 Server 的轉接層處理。
 
 本規格不處理下列事項：
 
@@ -80,18 +80,27 @@ ErrorCode 為穩定的機器可讀字串。函式庫不可自行改名、轉數�
 
 Payload JSON 欄位名稱為 PascalCase，必須與 DBCache 實際產生的 public field 同名。DTO 金額欄位使用 `decimal`；識別碼使用 `long` 或 `string`，不可降為 `int` 或 `double`；時間欄位以 ISO 8601 字串保留。
 
+Payload 根節點必須是 JSON 物件。解碼器必須驗證目前正式 Payload 的必要既有欄位及必要巢狀欄位均存在且型別正確；缺少或型別不符均為 `InvalidResponsePayload`。未知欄位應忽略，以保留新增可選欄位的向前相容性。
+
 ## Payload 欄位摘要
 
 |Payload 型別|主要欄位|
 |---|---|
-|`PromoGetPlayerOffersPayload`|`BusinessDay`、`HasActiveBonusTask`、`ActiveBonusTaskId`、`ActiveTask`、`Activities`、`TodayCompletedItems`|
+|`PromoGetPlayerOffersPayload`|`BusinessDay`、`HasActiveBonusTask`、`ActiveBonusTaskId`、`ActiveTask`、`Activities`、`TodayCompletedItems`；活動資料為精簡顯示模型。|
 |`PromoGetGamesPayload`|`ActivityUID`、`GameServerList`|
 |`PromoClaimPayload`|`EligibilityEntryId`、`BonusTaskId`、`ActivityUID`、`BusinessDay`、`BonusAmount`、`RequiredWagerAmount`、`CurrentWagerAmount`、`RemainingWagerAmount`、`MaxBetAmount`、`ClaimedAt`、`IsReplay`|
 |`PromoGetTaskPayload`|`HasActiveTask`、`Task`；`Task` 含 `BonusTaskId`、流水金額、`UnlockMode`、`CanClaimUnlock`、`EstimatedUnlockAmount` 等|
 |`PromoAbandonPayload`|`BonusTaskId`、`CloseReason`、`FinalCurrentWagerAmount`、`ConvertedAmount`、`ClosedAt`、`AlreadyClosed`|
 |`PromoGetHistoryPayload`|`FromInclusive`、`ToExclusive`、`Offset`、`Limit`、`Items`|
 
-完整欄位與巢狀 DTO 以 `PromotionClientCommands.cs` 與 `Promotion.Core.Contracts/CommonDtos.cs` 為準。
+### 玩家優惠頁巢狀契約
+
+- `Activities[].Activity` 是 `PromoActivityDisplayPayload`，只含活動名稱、紅利類型與金額／百分比設定、最低儲值、洗碼倍數、押注上限及每日領取上限。
+- `ActiveTask` 是 `PromoActiveBonusTaskPayload`，只含任務識別、活動識別、活動日、紅利／流水金額、押注上限與領取時間；CLIENT 以 `ActivityUID` 對照 `Activities` 顯示活動資訊。
+- `TodayCompletedItems` 是 `PromoTodayCompletedItemPayload`，只含歷史與畫面顯示所需資料，使用 `ActivityInfo`，不含活動快照。
+- Payload 不得要求或依賴 `ActivitySnapshotDto` 的 `SnapshotVersion`、`CapturedAt`、結算、流水貢獻或互斥規則欄位；這些欄位不是對外契約。
+
+完整公開欄位以 `PromotionClientCommands.cs` 與 ResponseDecoder 的 `Contracts/Payloads/PromoPayloads.cs` 為準；`Promotion.Core.Contracts` 的 DTO 僅為後端來源模型，不是直接序列化的公開格式。
 
 ## 函式庫解包流程
 
@@ -153,7 +162,7 @@ public interface IPromoResponseDecoder
 
 - `優惠錢包Request Response Command對照.md`：外部欄位、CLIENT 契約與各 Payload 詳細欄位。
 - `PromotionClientCommands.cs`：目前正式 Payload 的實際組裝與 JSON 序列化來源。
-- `Promotion.Core.Contracts/CommonDtos.cs`：巢狀 DTO 定義。
+- `Promotion.Core.Contracts/CommonDtos.cs`、`RequestsAndResults.cs`：巢狀 DTO 定義。
 - `05_錯誤碼重試及交易一致性規格.md`：錢包失敗、重試與結果不明的業務限制。
 
 函式庫的建立、手動 DLL 發佈、內部 NuGet 發佈與 GameServer 轉接方式，請參考 `Promotion.ResponseDecoder 函式庫製作與使用指導.md`。

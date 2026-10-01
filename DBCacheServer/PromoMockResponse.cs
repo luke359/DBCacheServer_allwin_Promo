@@ -24,41 +24,9 @@ namespace DBCacheServer
             switch (request.Command)
             {
                 case "PromoGetActivitiesRequest":
-                    return JsonSerializer.Serialize(new
-                    {
-                        BusinessDay = businessDay,
-                        Items = new object[]
-                        {
-                            new { ActivityUID = 1001L, ActivityInfo = "測試免費優惠", TriggerType = "Free",
-                                  BonusType = "FixedAmount", FixedBonusAmount = (int?)10,
-                                  DepositPercentage = (int?)null, MaxBonusAmount = (int?)null,
-                                  MinimumDepositAmount = (int?)null, WagerMultiplier = 30, DailyClaimLimit = 1 },
-                            new { ActivityUID = 1002L, ActivityInfo = "測試儲值優惠", TriggerType = "Deposit",
-                                  BonusType = "DepositPercentage", FixedBonusAmount = (int?)null,
-                                  DepositPercentage = (int?)30, MaxBonusAmount = (int?)50,
-                                  MinimumDepositAmount = (int?)100, WagerMultiplier = 20, DailyClaimLimit = 1 }
-                        }
-                    });
                 case "PromoGetPlayerOffersRequest":
-                    return JsonSerializer.Serialize(new
-                    {
-                        BusinessDay = businessDay,
-                        AvailableItems = new[]
-                        {
-                            new { EligibilityEntryId = 2001L, ActivityUID = 1001L, EventId = "MOCK-EVENT-1",
-                                  ActivityInfo = "測試免費優惠", TriggerType = "Free",
-                                  EligibleDepositAmount = (decimal?)null, EstimatedBonusAmount = 10m,
-                                  EstimatedRequiredWagerAmount = 300m, MaxBetAmount = (int?)5 }
-                        },
-                        ClaimedItems = new[]
-                        {
-                            new { EligibilityEntryId = 2002L, BonusTaskId = "MOCK-TASK-2002",
-                                  ActivityUID = 1002L, ActivityInfo = "測試儲值優惠",
-                                  BonusAmount = 30m, ClaimedAt = time, TaskState = "Active", CloseReason = "" }
-                        },
-                        HasActiveBonusTask = true,
-                        ActiveBonusTaskId = "MOCK-TASK-2002"
-                    });
+                    return CreatePlayerPromotionPagePayload(request, businessDay, time,
+                        request.Command == "PromoGetPlayerOffersRequest");
                 case "PromoGetGamesRequest":
                     return JsonSerializer.Serialize(new { ActivityUID = activityUid, GameServerList = "Wukong" });
                 case "PromoClaimRequest":
@@ -132,5 +100,67 @@ namespace DBCacheServer
         private static int GetInt(CommonInfoData request, string key, int fallback) =>
             int.TryParse(GetString(request, key, ""), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)
                 ? value : fallback;
+
+        private static string CreatePlayerPromotionPagePayload(CommonInfoData request, string businessDay,
+            string time, bool includeTodayCompleted)
+        {
+            object freeActivity = CreateActivityDisplay("測試免費優惠", 1, 10, 0, 0, null, 30, 5, 1);
+            object depositActivity = CreateActivityDisplay("測試儲值優惠", 2, 0, 50, 30, 100, 20, 5, 1);
+
+            return JsonSerializer.Serialize(new
+            {
+                BusinessDay = businessDay,
+                HasActiveBonusTask = true,
+                ActiveBonusTaskId = "MOCK-TASK-2002",
+                ActiveTask = new
+                {
+                    BonusTaskId = "MOCK-TASK-2002", EligibilityEntryId = 2002L, ActivityUID = 1002L,
+                    BusinessDay = businessDay, BonusAmount = 30m, RequiredWagerAmount = 600m,
+                    CurrentWagerAmount = 120m, RemainingWagerAmount = 480m, MaxBetAmount = (int?)5,
+                    ClaimedAt = time
+                },
+                Activities = new object[]
+                {
+                    new
+                    {
+                        ActivityUID = 1001L, Activity = freeActivity, EligibilityEntryId = (long?)2001L,
+                        CanClaim = true, HasActiveTask = false, ClaimButtonEnabled = false,
+                        ActiveTaskProgress = (object)null
+                    },
+                    new
+                    {
+                        ActivityUID = 1002L, Activity = depositActivity, EligibilityEntryId = (long?)null,
+                        CanClaim = false, HasActiveTask = true, ClaimButtonEnabled = false,
+                        ActiveTaskProgress = new
+                        {
+                            CurrentWagerAmount = 120m, RequiredWagerAmount = 600m, RemainingWagerAmount = 480m
+                        }
+                    }
+                },
+                TodayCompletedItems = includeTodayCompleted
+                    ? new object[]
+                    {
+                        new
+                        {
+                            BonusHistoryId = 3001L, BonusTaskId = "MOCK-TASK-3001", ActivityUID = 1001L,
+                            ActivityInfo = "測試免費優惠", BusinessDay = businessDay, BonusAmount = 10m,
+                            RequiredWagerAmount = 300m, CurrentWagerAmount = 300m, ConvertedAmount = 5m,
+                            CloseReason = "WagerCompleted",
+                            ClaimedAt = time, ClosedAt = time
+                        }
+                    }
+                    : Array.Empty<object>()
+            });
+        }
+
+        private static object CreateActivityDisplay(string activityInfo, int bonusType,
+            int fixedBonusAmount, int maxBonusAmount, int depositPercentage, int? minimumDepositAmount,
+            int wagerMultiplier, int? maxBetAmount, int dailyClaimLimit) => new
+            {
+                ActivityInfo = activityInfo, BonusType = bonusType,
+                FixedBonusAmount = fixedBonusAmount, MaxBonusAmount = maxBonusAmount,
+                DepositPercentage = depositPercentage, MinimumDepositAmount = minimumDepositAmount,
+                WagerMultiplier = wagerMultiplier, MaxBetAmount = maxBetAmount, DailyClaimLimit = dailyClaimLimit
+            };
     }
 }

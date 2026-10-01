@@ -24,11 +24,12 @@
 |必要|`DBCacheServer/Promotion/Promotion.ResponseDecoder 解包規格.md`|解包優先順序、錯誤處理、`Success` 規則|主要實作規格|
 |必要|`DBCacheServer/Promotion/優惠錢包Request Response Command對照.md`|八組 Command、所有外部回覆欄位、CLIENT 封包契約|DTO 與測試案例依據|
 |必要|`DBCacheServer/Promotion/PromotionClientCommands.cs`|DBCache 實際寫出的 Payload 型別、欄位與 JSON 產生位置|Payload DTO 的權威實作對照；僅作參考，不直接編譯引用|
-|必要|`Promotion/src/Promotion.Core.Contracts/CommonDtos.cs`|巢狀型別，例如 `ActivitySnapshotDto`、`ActiveBonusTaskDto`、`BonusHistoryDto`|完整巢狀 DTO 欄位依據|
+|必要|`Promotion/src/Promotion.Core.Contracts/CommonDtos.cs`|後端來源型別，例如 `ActivitySnapshotDto`、`BonusHistoryDto`|僅用於理解 DBCache 映射來源，不是公開 Payload 欄位依據|
+|必要|`Promotion/src/Promotion.Core.Contracts/RequestsAndResults.cs`|`ActiveBonusTaskDto`、`BonusTaskProgressDto` 與玩家優惠頁來源型別|僅用於理解 DBCache 映射來源；公開欄位以 `PromotionClientCommands.cs` 為準|
 |必要|各 Game Server 專案內的 `CommonInfoData` 定義檔|確認外層欄位與 `Data` 字典實際型別|撰寫各 Server 的轉接層|
 |必要|各 Game Server 專案內的 `PromoResponseBase` 與八個 `Promo*Response` 定義檔|確認 CLIENT Response 是否持有 `Payload` 屬性或採扁平欄位|撰寫各 Server 的映射層|
 |必要|各 Game Server 專案內的 `CommonInfoDataCompletedHandler`（或等效接收處理器）及 SignalR 傳送檔|確認玩家查找、封包 `Type`／`Content` 與例外記錄規則|撰寫各 Server 的轉接層|
-|建議|`DBCacheServer/PromoMockResponse.cs`|八種測試 Payload 範例|建立 JSON 解包測試資料|
+|建議|`DBCacheServer/PromoMockResponse.cs`|通訊測試 Payload 範例|只供 Mock 測試對照；正式解包 Fixture 必須依 `PromotionClientCommands.cs` 的實際輸出建立，不能把舊 Mock 格式視為正式契約|
 |建議|`Promotion/Doc/05_錯誤碼重試及交易一致性規格.md`|錢包失敗與結果不明的業務限制|驗證錯誤後 CLIENT 行為|
 
 ### 2.1 不應直接複製為相依組件的檔案
@@ -43,6 +44,7 @@
 4. `Data`、其鍵值與 Payload 都可能缺少。正常協定錯誤不可中斷接收迴圈。
 5. 金額欄位使用 `decimal`；識別碼使用 `long` 或 `string`；時間欄位保留 ISO 8601 字串。
 6. 目前正式 `PromoClaimUnlockResponse` 只預期 `ErrorCode=NotImplemented` 且沒有 Payload。`PromoMockResponse.cs` 的解鎖成功 Payload 僅供 Mock 測試，不能視為正式已上線契約。
+7. `PromoGetActivitiesResponse` 與 `PromoGetPlayerOffersResponse` 在 DBCache→Game Server 區段共用精簡玩家優惠頁 Payload。Payload 只提供 Client 顯示所需的活動規則與任務／歷史資訊；完整 `ActivitySnapshotDto` 不在公開 JSON 中。函式庫以 DBCache Payload 為準，不直接參考 `WebProtocol`。
 
 ## 4. 建議專案結構
 
@@ -101,6 +103,8 @@ dotnet sln add tests/Promotion.ResponseDecoder.Tests/Promotion.ResponseDecoder.T
 
 若有 Game Server 無法執行 .NET 10，才依其實際版本改採較低目標框架（例如 `net6.0`）；若必須同時支援不同世代服務，再評估 `netstandard2.0`。這是相容性決策，須先盤點所有目標服務後再變更。不可在未確認相容需求前同時維護多個 Target Framework。
 
+本案已確認目標 Game Server 使用 `net10.0`，因此本版本只維護單一 `net10.0` Target Framework。
+
 ## 6. 公開 API 設計
 
 函式庫輸入須使用中立模型，不直接接收某個 Server 的 `CommonInfoData`：
@@ -137,6 +141,8 @@ public interface IPromoResponseDecoder
 
 `Decode` 對於下列可預期輸入不可擲出例外：`Data` 缺少、鍵值缺少、空白 Payload、無效 JSON、JSON 型別不符、未知 Command。只有無法恢復的程式錯誤才由呼叫端的全域例外處理器記錄。
 
+Payload 驗證採開放式契約：目前正式 Payload 的所有必要既有欄位，包含必要巢狀欄位，必須存在且符合宣告型別；缺少或型別不符均為 `InvalidResponsePayload`。未知欄位必須忽略，以保留向前相容性。`PromoGetActivitiesResponse` 的 `TodayCompletedItems` 必須為空陣列。
+
 ## 7. 解包規則
 
 `PromoResponseDecoder.Decode` 必須完全遵循以下規則：
@@ -168,6 +174,8 @@ public interface IPromoResponseDecoder
   → 依 Command 將結果映射為該 Server 的 Promo*Response
   → 依既有 SignalR 規則送出 Type=Response 類別名、Content=Response JSON
 ```
+
+上圖前半段是 DBCache→Game Server 的 `CommonInfoData` 協定；最後的 CLIENT Response／SignalR 是另一段協定。即使兩段欄位不同，差異也由各 Game Server 的轉接層處理，不能讓 ResponseDecoder 相依 `WebProtocol` 或任一 CLIENT Response 型別。
 
 轉接層範例：
 
@@ -210,7 +218,7 @@ SendToPlayer(player, clientResponse);
 6. `PromoClaimUnlockResponse`：`NotImplemented`、無 Payload，預期一般失敗結果。
 7. `Data=null`、空字典、鍵值為 null、未知 Command。
 
-測試資料優先來自 `PromoMockResponse.cs`，另需自行建立 ErrorCode 與錯誤 JSON Fixture。不可只測試 Mock 成功路徑。
+正式成功 Fixture 必須依 `PromotionClientCommands.cs` 的實際 JSON 輸出建立；`PromoMockResponse.cs` 僅供通訊測試對照，不能作為 `PromoGetActivitiesResponse`、`PromoGetPlayerOffersResponse` 或 `PromoClaimUnlockResponse` 的正式成功契約。另需建立 ErrorCode 與錯誤 JSON Fixture。不可只測試 Mock 成功路徑。
 
 ## 10. 先以手動 DLL 發佈
 

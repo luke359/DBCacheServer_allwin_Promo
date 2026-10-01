@@ -1693,45 +1693,69 @@ namespace WebProtocol
     }
 
     [Serializable]
-    public class PromoActivityItem
+    public class PromoActivityDisplayItem
     {
-        public long ActivityUID;
         public string ActivityInfo = "";
-        public string TriggerType = "";
-        public string BonusType = "";
-        public int? FixedBonusAmount;
-        public int? DepositPercentage;
-        public int? MaxBonusAmount;
+        public int BonusType;
+        public int FixedBonusAmount;
+        public int MaxBonusAmount;
+        public int DepositPercentage;
         public int? MinimumDepositAmount;
         public int WagerMultiplier;
+        public int? MaxBetAmount;
         public int DailyClaimLimit;
     }
 
     [Serializable]
-    public class PromoAvailableOfferItem
+    public class PromoBonusTaskProgressItem
     {
-        public long EligibilityEntryId;
-        public long ActivityUID;
-        public string EventId = "";
-        public string ActivityInfo = "";
-        public string TriggerType = "";
-        public decimal? EligibleDepositAmount;
-        public decimal EstimatedBonusAmount;
-        public decimal EstimatedRequiredWagerAmount;
-        public int? MaxBetAmount;
+        public decimal CurrentWagerAmount;
+        public decimal RequiredWagerAmount;
+        public decimal RemainingWagerAmount;
     }
 
     [Serializable]
-    public class PromoClaimedOfferItem
+    public class PromoPlayerPromotionActivityItem
     {
+        public long ActivityUID;
+        public PromoActivityDisplayItem Activity = new PromoActivityDisplayItem();
+        public long? EligibilityEntryId;
+        public bool CanClaim;
+        public bool HasActiveTask;
+        public bool ClaimButtonEnabled;
+        public PromoBonusTaskProgressItem ActiveTaskProgress;
+    }
+
+    [Serializable]
+    public class PromoActiveBonusTaskItem
+    {
+        public string BonusTaskId = "";
         public long EligibilityEntryId;
+        public long ActivityUID;
+        public string BusinessDay = "";
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal RemainingWagerAmount;
+        public int? MaxBetAmount;
+        public string ClaimedAt = "";
+    }
+
+    [Serializable]
+    public class PromoTodayCompletedItem
+    {
+        public long BonusHistoryId;
         public string BonusTaskId = "";
         public long ActivityUID;
+        public string BusinessDay = "";
         public string ActivityInfo = "";
         public decimal BonusAmount;
-        public string ClaimedAt = "";
-        public string TaskState = "";
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal ConvertedAmount;
         public string CloseReason = "";
+        public string ClaimedAt = "";
+        public string ClosedAt = "";
     }
 
     [Serializable]
@@ -1769,20 +1793,24 @@ namespace WebProtocol
     }
 
     [Serializable]
-    public class PromoGetActivitiesResponse : PromoResponseBase
+    public class PromoPlayerPromotionPageResponse : PromoResponseBase
     {
         public string BusinessDay = "";
-        public List<PromoActivityItem> Items = new List<PromoActivityItem>();
+        public bool HasActiveBonusTask;
+        public string ActiveBonusTaskId = "";
+        public PromoActiveBonusTaskItem ActiveTask;
+        public List<PromoPlayerPromotionActivityItem> Activities = new List<PromoPlayerPromotionActivityItem>();
+        public List<PromoTodayCompletedItem> TodayCompletedItems = new List<PromoTodayCompletedItem>();
     }
 
     [Serializable]
-    public class PromoGetPlayerOffersResponse : PromoResponseBase
+    public class PromoGetActivitiesResponse : PromoPlayerPromotionPageResponse
     {
-        public string BusinessDay = "";
-        public List<PromoAvailableOfferItem> AvailableItems = new List<PromoAvailableOfferItem>();
-        public List<PromoClaimedOfferItem> ClaimedItems = new List<PromoClaimedOfferItem>();
-        public bool HasActiveBonusTask;
-        public string ActiveBonusTaskId = "";
+    }
+
+    [Serializable]
+    public class PromoGetPlayerOffersResponse : PromoPlayerPromotionPageResponse
+    {
     }
 
     [Serializable]
@@ -1847,6 +1875,7 @@ namespace WebProtocol
         public List<PromoHistoryItem> Items = new List<PromoHistoryItem>();
     }
 
+    //
     [Serializable]
     public class WebGetUserTransaction
     {

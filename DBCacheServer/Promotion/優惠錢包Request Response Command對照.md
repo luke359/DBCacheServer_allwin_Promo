@@ -8,8 +8,8 @@ CLIENT 透過 POST /api/wukong/CommonCommand 送出 CommonInfoData，Wukong 經 
 
 |用途|Request Command|Response Command|請求 Data|
 |---|---|---|---|
-|查詢玩家所屬代理商在本 活動日的全部活動|PromoGetActivitiesRequest|PromoGetActivitiesResponse|無必填值|
-|查詢玩家本活動日可領與 已領優惠|PromoGetPlayerOffersRequest|PromoGetPlayerOffersResponse|無必填值|
+|查詢玩家優惠頁（不含當日完成紀錄）|PromoGetActivitiesRequest|PromoGetActivitiesResponse|無必填值|
+|查詢玩家優惠頁（含當日完成紀錄）|PromoGetPlayerOffersRequest|PromoGetPlayerOffersResponse|無必填值|
 |查詢指定活動可玩遊戲|PromoGetGamesRequest|PromoGetGamesResponse|ActivityUID|
 |領取選定資格|PromoClaimRequest|PromoClaimResponse|EligibilityEntryId|
 |查詢進行中任務與流水|PromoGetTaskRequest|PromoGetTaskResponse|無必填值|
@@ -58,15 +58,37 @@ Request 的 Data 值均為字串；整數與金額使用無千分位的十進位
 |BusinessDay|string|查詢所屬活動日，格式 yyyy-MM-dd。|
 |HasActiveBonusTask|bool|玩家是否有進行中的 Bonus Task。|
 |ActiveBonusTaskId|string|目前任務 ID；沒有任務時為空字串。|
-|ActiveTask|ActiveBonusTaskDto|null 或唯一一筆進行中任務。|
+|ActiveTask|PromoActiveBonusTaskPayload|null 或唯一一筆進行中任務；不包含活動快照。|
 |Activities|List<PromoPlayerPromotionActivityPayload>|所有啟用且授權可見的活動，依 ActivityUID 遞增。|
-|Activities[].Activity|ActivitySnapshotDto|活動資訊與畫面規則欄位。|
+|Activities[].Activity|PromoActivityDisplayPayload|僅包含畫面顯示所需的活動規則欄位。|
 |Activities[].EligibilityEntryId|long?|可領資格 ID；為 null 表示不可領。|
 |Activities[].CanClaim|bool|資格是否已成立。|
 |Activities[].HasActiveTask|bool|此活動是否為玩家目前正在進行的任務。|
 |Activities[].ClaimButtonEnabled|bool|前端唯一可用於啟用領取按鈕的旗標。|
 |Activities[].ActiveTaskProgress|BonusTaskProgressDto?|進行中任務的目前／需求／剩餘流水；其他活動為 null。|
-|TodayCompletedItems|List<BonusHistoryDto>|僅玩家優惠頁查詢回傳；不影響主清單資格或按鈕。|
+|TodayCompletedItems|List<PromoTodayCompletedItemPayload>|僅玩家優惠頁查詢回傳；不影響主清單資格或按鈕。|
+
+### 玩家優惠頁巢狀欄位
+
+`Activities[].Activity` 的 `PromoActivityDisplayPayload` 僅包含下列可顯示規則；CLIENT 不可據此自行計算領取資格、紅利、流水或結算：
+
+|欄位|型別|用途|
+|---|---|---|
+|ActivityInfo|string|活動顯示文字。|
+|BonusType|int|紅利類型列舉值。|
+|FixedBonusAmount|int|固定紅利金額設定。|
+|MaxBonusAmount|int|百分比紅利上限設定。|
+|DepositPercentage|int|儲值百分比設定。|
+|MinimumDepositAmount|int?|最低儲值門檻；免費活動可為 null。|
+|WagerMultiplier|int|洗碼倍數。|
+|MaxBetAmount|int?|單筆押注上限；null 表示無限制。|
+|DailyClaimLimit|int|每日可領上限。|
+
+`ActiveTask` 包含 `BonusTaskId`、`EligibilityEntryId`、`ActivityUID`、`BusinessDay`、`BonusAmount`、目前／需求／剩餘流水、`MaxBetAmount` 及 `ClaimedAt`。CLIENT 可用其 `ActivityUID` 對照 `Activities` 取得活動顯示資訊。
+
+`TodayCompletedItems` 每筆包含 `BonusHistoryId`、`BonusTaskId`、`ActivityUID`、`ActivityInfo`、`BusinessDay`、Bonus／流水／轉換金額、`CloseReason`、`ClaimedAt` 及 `ClosedAt`。
+
+公開 Payload 不包含 `ActivitySnapshotDto`、`SnapshotVersion`、`CapturedAt`、`WagerCalculationType`、`WagerContributionRate`、`ConvertType`、互斥群組或結算上限等後端快照與結算欄位；這些欄位僅供 Promotion Core 使用。
 
 ## PromoGetGamesResponse
 

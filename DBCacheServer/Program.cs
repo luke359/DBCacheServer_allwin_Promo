@@ -13693,9 +13693,9 @@ namespace DBCacheServer
         {
             switch (command)
             {
-                case "PromoGetActivitiesRequest": // 查詢玩家所屬代理商在本活動日的全部活動
+                case "PromoGetActivitiesRequest": // 查詢玩家優惠頁；TodayCompletedItems 固定為空集合
                     return "PromoGetActivitiesResponse";
-                case "PromoGetPlayerOffersRequest": // 查詢玩家本活動日可領及已領的活動優惠
+                case "PromoGetPlayerOffersRequest": // 查詢玩家優惠頁，並附帶本活動日已完成項目
                     return "PromoGetPlayerOffersResponse";
                 case "PromoGetGamesRequest": // 查詢指定活動的可玩遊戲列表
                     return "PromoGetGamesResponse";

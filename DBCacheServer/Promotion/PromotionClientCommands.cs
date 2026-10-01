@@ -99,11 +99,9 @@ namespace DBCacheServer
                 BusinessDay = result.Data.BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 HasActiveBonusTask = result.Data.HasAnyActiveBonusTask,
                 ActiveBonusTaskId = result.Data.ActiveTask?.BonusTaskId ?? "",
-                ActiveTask = result.Data.ActiveTask,
+                ActiveTask = MapActiveTask(result.Data.ActiveTask),
                 Activities = MapActivities(result.Data.Activities),
-                TodayCompletedItems = result.Data.TodayCompletedItems is null
-                    ? new List<BonusHistoryDto>()
-                    : new List<BonusHistoryDto>(result.Data.TodayCompletedItems)
+                TodayCompletedItems = MapTodayCompletedItems(result.Data.TodayCompletedItems)
             });
         }
 
@@ -124,12 +122,75 @@ namespace DBCacheServer
                 list.Add(new PromoPlayerPromotionActivityPayload
                 {
                     ActivityUID = item.ActivityUID,
-                    Activity = item.Activity,
+                    Activity = MapActivity(item.Activity),
                     EligibilityEntryId = item.EligibilityEntryId,
                     CanClaim = item.CanClaim,
                     HasActiveTask = item.HasActiveTask,
                     ClaimButtonEnabled = item.ClaimButtonEnabled,
                     ActiveTaskProgress = item.ActiveTaskProgress
+                });
+            }
+            return list;
+        }
+
+        private static PromoActivityDisplayPayload MapActivity(ActivitySnapshotDto activity)
+        {
+            return new PromoActivityDisplayPayload
+            {
+                ActivityInfo = activity.ActivityInfo ?? "",
+                BonusType = (int)activity.BonusType,
+                FixedBonusAmount = activity.FixedBonusAmount,
+                MaxBonusAmount = activity.MaxBonusAmount,
+                DepositPercentage = activity.DepositPercentage,
+                MinimumDepositAmount = activity.MinimumDepositAmount,
+                WagerMultiplier = activity.WagerMultiplier,
+                MaxBetAmount = activity.MaxBetAmount,
+                DailyClaimLimit = activity.DailyClaimLimit
+            };
+        }
+
+        private static PromoActiveBonusTaskPayload MapActiveTask(ActiveBonusTaskDto task)
+        {
+            if (task == null)
+                return null;
+            return new PromoActiveBonusTaskPayload
+            {
+                BonusTaskId = task.BonusTaskId ?? "",
+                EligibilityEntryId = task.EligibilityEntryId,
+                ActivityUID = task.ActivityUID,
+                BusinessDay = task.BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                BonusAmount = task.BonusAmount,
+                RequiredWagerAmount = task.RequiredWagerAmount,
+                CurrentWagerAmount = task.CurrentWagerAmount,
+                RemainingWagerAmount = task.RemainingWagerAmount,
+                MaxBetAmount = task.MaxBetAmount,
+                ClaimedAt = FormatTime(task.ClaimedAt)
+            };
+        }
+
+        private static List<PromoTodayCompletedItemPayload> MapTodayCompletedItems(
+            IReadOnlyList<BonusHistoryDto> items)
+        {
+            List<PromoTodayCompletedItemPayload> list = new List<PromoTodayCompletedItemPayload>();
+            if (items == null)
+                return list;
+            for (int i = 0; i < items.Count; i++)
+            {
+                BonusHistoryDto item = items[i];
+                list.Add(new PromoTodayCompletedItemPayload
+                {
+                    BonusHistoryId = item.BonusHistoryId,
+                    BonusTaskId = item.BonusTaskId ?? "",
+                    ActivityUID = item.ActivityUID,
+                    ActivityInfo = item.ActivitySnapshot?.ActivityInfo ?? "",
+                    BusinessDay = item.BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    BonusAmount = item.BonusAmount,
+                    RequiredWagerAmount = item.RequiredWagerAmount,
+                    CurrentWagerAmount = item.CurrentWagerAmount,
+                    ConvertedAmount = item.ConvertedAmount,
+                    CloseReason = item.CloseReason.ToString(),
+                    ClaimedAt = FormatTime(item.ClaimedAt),
+                    ClosedAt = FormatTime(item.ClosedAt)
                 });
             }
             return list;
@@ -398,20 +459,63 @@ namespace DBCacheServer
         public string BusinessDay = "";
         public bool HasActiveBonusTask;
         public string ActiveBonusTaskId = "";
-        public ActiveBonusTaskDto ActiveTask;
+        public PromoActiveBonusTaskPayload ActiveTask;
         public List<PromoPlayerPromotionActivityPayload> Activities = new List<PromoPlayerPromotionActivityPayload>();
-        public List<BonusHistoryDto> TodayCompletedItems = new List<BonusHistoryDto>();
+        public List<PromoTodayCompletedItemPayload> TodayCompletedItems = new List<PromoTodayCompletedItemPayload>();
+    }
+
+    internal sealed class PromoActivityDisplayPayload
+    {
+        public string ActivityInfo = "";
+        public int BonusType;
+        public int FixedBonusAmount;
+        public int MaxBonusAmount;
+        public int DepositPercentage;
+        public int? MinimumDepositAmount;
+        public int WagerMultiplier;
+        public int? MaxBetAmount;
+        public int DailyClaimLimit;
     }
 
     internal sealed class PromoPlayerPromotionActivityPayload
     {
         public long ActivityUID;
-        public ActivitySnapshotDto Activity;
+        public PromoActivityDisplayPayload Activity;
         public long? EligibilityEntryId;
         public bool CanClaim;
         public bool HasActiveTask;
         public bool ClaimButtonEnabled;
         public BonusTaskProgressDto ActiveTaskProgress;
+    }
+
+    internal sealed class PromoActiveBonusTaskPayload
+    {
+        public string BonusTaskId = "";
+        public long EligibilityEntryId;
+        public long ActivityUID;
+        public string BusinessDay = "";
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal RemainingWagerAmount;
+        public int? MaxBetAmount;
+        public string ClaimedAt = "";
+    }
+
+    internal sealed class PromoTodayCompletedItemPayload
+    {
+        public long BonusHistoryId;
+        public string BonusTaskId = "";
+        public long ActivityUID;
+        public string ActivityInfo = "";
+        public string BusinessDay = "";
+        public decimal BonusAmount;
+        public decimal RequiredWagerAmount;
+        public decimal CurrentWagerAmount;
+        public decimal ConvertedAmount;
+        public string CloseReason = "";
+        public string ClaimedAt = "";
+        public string ClosedAt = "";
     }
 
     internal sealed class PromoGetGamesPayload
